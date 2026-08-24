@@ -1,0 +1,40 @@
+/* Shot-only: placeholder thumbs + clip frame. Product CSS stays in sidepanel.css */
+html, body {
+  width: 400px;
+  height: 820px;
+  overflow: hidden;
+}
+.thumb {
+  background:
+    linear-gradient(135deg, #2a2c38 0%, #1a1c24 100%);
+  color: #8b8f98;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.thumb[data-cat="Tactical"] { background: linear-gradient(135deg, #3d4568, #1c1e28); }
+.thumb[data-cat="Ideation"] { background: linear-gradient(135deg, #3a4a3a, #1c1e28); }
+.thumb[data-cat="Strategy"] { background: linear-gradient(135deg, #4a3d38, #1c1e28); }
+.thumb[data-cat="News"] { background: linear-gradient(135deg, #3a3d4a, #1c1e28); }
+select.card-cat { pointer-events: none; }
+input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border: 1px solid #2a2c32;
+  border-radius: 3px;
+  background: #121317;
+}
+input[type="checkbox"]:checked {
+  background: #6b75d6;
+  border-color: #6b75d6;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='white' d='M10.2 2.8 4.8 8.6 1.8 5.6l1-1 2 2 4.4-4.8z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px;
+}

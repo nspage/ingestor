@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Note — shot</title>
+  <link rel="stylesheet" href="../../chrome-extension/sidepanel.css" />
+  <link rel="stylesheet" href="_shot.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <div class="brand">Pipeline</div>
+      <div class="status">
+        <button type="button" class="helper-pill on" disabled>
+          <span class="helper-dot"></span>
+          <span>Helper on</span>
+        </button>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="icon-btn">⚙</button>
+    </div>
+  </header>
+  <section class="view note-view active" style="display:flex;flex-direction:column;overflow:hidden;padding-bottom:8px;flex:1">
+    <div class="note-scroll">
+      <button type="button" class="text-btn">← History</button>
+      <h1 class="note-title">A production eval harness you can copy</h1>
+      <div class="meta">Studio Hours · Tactical · 2d ago · Gemini</div>
+      <div class="row-actions note-toolbar">
+        <div class="doc-mode" role="tablist">
+          <button class="doc-mode-btn on">Note</button>
+          <button class="doc-mode-btn">Transcript</button>
+        </div>
+        <button class="btn discard">Copy markdown</button>
+        <button class="text-btn">Open video</button>
+      </div>
+      <article class="md">
+        <p><strong>Speaker:</strong> Maya Chen, staff engineer, Studio Hours</p>
+        <h3>Goal / Outcome</h3>
+        <p>A single-repo eval harness that scores agent traces against a gold set of 40 tasks, runnable in CI on every PR.</p>
+        <h3>Resource stack</h3>
+        <ul>
+          <li><code>pytest</code> + a JSONL gold file</li>
+          <li>OpenTelemetry traces, not screenshots</li>
+          <li>Gemini Flash for the judge; Pro only on fail</li>
+        </ul>
+        <h3>Tactical tutorial (SOP)</h3>
+        <ol>
+          <li>Freeze 40 tasks as <code>gold.jsonl</code> (input, expected tool calls, expected final).</li>
+          <li>Run the agent with tracing on. Write one span per tool call.</li>
+          <li>Diff spans against gold. Fail the PR on missing or extra tools.</li>
+          <li>Only then call a judge model on the final answer.</li>
+        </ol>
+        <h3>Heuristics &amp; pitfalls</h3>
+        <ul>
+          <li>Do not let the judge invent extra criteria.</li>
+          <li>If the gold set moves weekly, you are measuring prompt churn, not quality.</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+</body>
+</html>

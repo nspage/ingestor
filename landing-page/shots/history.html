@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>History — shot</title>
+  <link rel="stylesheet" href="../../chrome-extension/sidepanel.css" />
+  <link rel="stylesheet" href="_shot.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <div class="brand">Pipeline</div>
+      <div class="status">
+        <button type="button" class="helper-pill on" disabled>
+          <span class="helper-dot"></span>
+          <span>Helper on</span>
+        </button>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="icon-btn">⚙</button>
+    </div>
+  </header>
+  <nav class="tabs">
+    <button class="tab">Pending <span class="badge">6</span></button>
+    <button class="tab">Channels <span class="badge">4</span></button>
+    <button class="tab active">History <span class="badge">18</span></button>
+  </nav>
+  <section class="view active" style="display:block">
+    <div class="inbox-row">
+      <input class="search" type="search" placeholder="Search title or channel" value="" readonly />
+      <button type="button" class="text-btn">Select all</button>
+    </div>
+    <div class="filter-block">
+      <div class="filter-label">Source</div>
+      <div class="filters">
+        <button class="chip cat on">All</button>
+        <button class="chip cat">Gemini</button>
+        <button class="chip cat">API</button>
+      </div>
+    </div>
+    <div class="bulk">
+      <span>1 selected</span>
+      <button type="button" class="btn process">Save .md</button>
+      <button type="button" class="btn process">Save transcript</button>
+      <button type="button" class="text-btn">Open videos</button>
+    </div>
+    <div class="list">
+      <article class="card">
+        <input type="checkbox" checked />
+        <div class="thumb" data-cat="Tactical">22:11</div>
+        <div>
+          <div class="title">A production eval harness you can copy</div>
+          <div class="meta">Studio Hours · 2d ago · Gemini</div>
+          <div class="row-actions">
+            <button class="text-btn">Open note</button>
+            <button class="text-btn">Open transcript</button>
+            <button class="text-btn">Open video</button>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <input type="checkbox" />
+        <div class="thumb" data-cat="Strategy">54:03</div>
+        <div>
+          <div class="title">Distribution before product, still</div>
+          <div class="meta">Operator Notes · 4d ago</div>
+          <div class="row-actions">
+            <button class="text-btn">Open note</button>
+            <button class="text-btn">Open transcript</button>
+            <button class="text-btn">Open video</button>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <input type="checkbox" />
+        <div class="thumb" data-cat="Ideation">33:40</div>
+        <div>
+          <div class="title">Unbundling the AI intern</div>
+          <div class="meta">Compound · 6d ago · Gemini</div>
+          <div class="row-actions">
+            <button class="text-btn">Open note</button>
+            <button class="text-btn">Open transcript</button>
+            <button class="text-btn">Open video</button>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <input type="checkbox" />
+        <div class="thumb" data-cat="News">24:12</div>
+        <div>
+          <div class="title">What actually shipped this week</div>
+          <div class="meta">The Roundup · 1w ago</div>
+          <div class="row-actions">
+            <button class="text-btn">Open note</button>
+            <button class="text-btn">Open transcript</button>
+            <button class="text-btn">Open video</button>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Channels — shot</title>
+  <link rel="stylesheet" href="../../chrome-extension/sidepanel.css" />
+  <link rel="stylesheet" href="_shot.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <div class="brand">Pipeline</div>
+      <div class="status">
+        <button type="button" class="helper-pill on" disabled>
+          <span class="helper-dot"></span>
+          <span>Helper on</span>
+        </button>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="icon-btn">⚙</button>
+    </div>
+  </header>
+  <nav class="tabs">
+    <button class="tab">Pending <span class="badge">6</span></button>
+    <button class="tab active">Channels <span class="badge">4</span></button>
+    <button class="tab">History <span class="badge">18</span></button>
+  </nav>
+  <section class="view active" style="display:block">
+    <div class="add-row">
+      <input type="text" value="@studiohours" readonly />
+      <select><option>Tactical</option></select>
+      <button type="button" class="btn process">Track</button>
+    </div>
+    <div class="list">
+      <article class="card" style="grid-template-columns:1fr">
+        <div>
+          <div class="title">Compound</div>
+          <div class="meta">Ideation · UC-compound · last 5h ago</div>
+          <div class="row-actions"><button class="btn discard">Remove</button></div>
+        </div>
+      </article>
+      <article class="card" style="grid-template-columns:1fr">
+        <div>
+          <div class="title">Operator Notes</div>
+          <div class="meta">Strategy · UC-operator · last yesterday</div>
+          <div class="row-actions"><button class="btn discard">Remove</button></div>
+        </div>
+      </article>
+      <article class="card" style="grid-template-columns:1fr">
+        <div>
+          <div class="title">Studio Hours</div>
+          <div class="meta">Tactical · UC-studio · last 2h ago</div>
+          <div class="row-actions"><button class="btn discard">Remove</button></div>
+        </div>
+      </article>
+      <article class="card" style="grid-template-columns:1fr">
+        <div>
+          <div class="title">The Roundup</div>
+          <div class="meta">News/Roundup · UC-roundup · last yesterday</div>
+          <div class="row-actions"><button class="btn discard">Remove</button></div>
+        </div>
+      </article>
+    </div>
+  </section>
+</body>
+</html>

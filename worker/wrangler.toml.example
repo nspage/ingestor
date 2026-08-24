@@ -1,0 +1,17 @@
+name = "yt-pipeline-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-30"
+
+# Create a namespace, then paste the id:
+#   npx wrangler kv namespace create YT_PIPELINE
+[[kv_namespaces]]
+binding = "YT_KV"
+id = "YOUR_KV_NAMESPACE_ID"
+
+# Set secrets with `npx wrangler secret put NAME` (do not put them here):
+#   WORKER_API_SECRET
+#   GOOGLE_API_KEY          (optional)
+#   TELEGRAM_BOT_TOKEN      (optional)
+#   TELEGRAM_CHAT_ID        (optional)
+#   TRIGGER_SECRET_KEY      (optional)
+#   TRIGGER_API_URL         (optional)

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ingestor — an inbox for the channels you already follow</title>
+  <meta name="description" content="New videos land in a queue. You process or discard. Gemini extracts a note shaped by the kind of video it is. The file stays on your machine." />
+  <link rel="canonical" href="https://coolcoolcool.xyz/ingestor" />
+  <meta property="og:title" content="ingestor" />
+  <meta property="og:description" content="An inbox for the YouTube channels you already follow. Triage, extract, keep the Markdown. Local helper — not a cloud summarizer." />
+  <meta property="og:image" content="https://coolcoolcool.xyz/ingestor/og.png" />
+  <meta property="og:url" content="https://coolcoolcool.xyz/ingestor" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ingestor" />
+  <meta name="twitter:description" content="An inbox for the YouTube channels you already follow. Triage, extract, keep the Markdown." />
+  <meta name="twitter:image" content="https://coolcoolcool.xyz/ingestor/og.png" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="wordmark" href="./">ingestor</a>
+      <ul class="nav-links">
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="https://github.com/nspage/ingestor#readme">Docs</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a class="btn btn-ghost" href="#waitlist">Join waitlist</a>
+        <a class="btn btn-ink" data-github href="https://github.com/nspage/ingestor">Get the extension</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <p class="eyebrow">ingestor</p>
+          <h1>An inbox for the channels you already follow.</h1>
+          <p class="sub">New videos land in a queue. You process or discard. Gemini extracts a note in the shape of that video — SOP, framework, or briefing — and the file stays on your machine.</p>
+          <div class="hero-actions">
+            <a class="btn btn-ink" data-github href="https://github.com/nspage/ingestor">Get the extension</a>
+            <a class="btn btn-ghost" href="#waitlist">Join the waitlist</a>
+          </div>
+          <p class="helper-line">Free on GitHub. A helper runs on your computer — not in the Chrome Web Store yet.</p>
+        </div>
+        <figure class="well">
+          <img src="shots/pending.png" width="400" height="820" fetchpriority="high" alt="Side panel showing a pending inbox of YouTube videos with category filters and the local helper turned on." />
+          <span class="well-cap"><i></i>Helper · on</span>
+        </figure>
+      </div>
+    </section>
+
+    <section class="stack" aria-label="The stack">
+      <div class="wrap stack-inner">
+        <div class="stack-head">
+          <h2>THE STACK</h2>
+          <p class="stack-cap">The tools it actually talks to.</p>
+        </div>
+        <div class="stack-row">
+          <span class="stack-item">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 9.5v5l5-2.5z" fill="currentColor"/></svg>
+            YouTube
+          </span>
+          <span class="stack-item">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15c2-6 6-9 10-9 5 0 7 4 8 7-3 1-5 1-8-1-2 3-5 5-10 3z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            Cloudflare
+          </span>
+          <span class="stack-item">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 6.2L20 11l-6.2 1.8L12 19l-1.8-6.2L4 11l6.2-1.8z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            Gemini
+          </span>
+          <span class="stack-item">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            Chrome
+          </span>
+          <span class="stack-item">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l16-7-7 16-2-6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            Telegram
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <section class="problem">
+      <div class="wrap problem-grid">
+        <div>
+          <p class="eyebrow">The job</p>
+          <h2>Watch Later is not a system.</h2>
+          <p>The people you follow publish faster than you can watch. Pasting a transcript into Gemini gives you one chat you will lose. One-click summarizers are built for the video you are already on — not for the list of channels you already chose.</p>
+        </div>
+        <blockquote class="pull">You already know who to follow. You need the inbox.</blockquote>
+      </div>
+    </section>
+
+    <section class="how" id="how">
+      <div class="wrap">
+        <div class="how-head">
+          <p class="eyebrow">How it works</p>
+          <h2>The inbox fills in the background. The thinking happens when you sit down.</h2>
+          <p class="sub">Ingestion runs in your Cloudflare worker. Notes are written on your machine. That split is the product, not a workaround we dressed up.</p>
+        </div>
+        <div class="how-grid">
+          <figure class="how-figure" data-how-figure>
+            <div class="well">
+              <img src="shots/pending.png" alt="Pending queue with two videos selected." />
+            </div>
+            <figcaption>03 · You triage</figcaption>
+          </figure>
+          <div class="how-steps" role="list">
+            <button class="how-step" type="button" role="listitem"
+              data-src="shots/channels.png"
+              data-pos="top"
+              data-cap="01 · Track a channel"
+              data-alt="Channels tab with an add-URL field and four tracked channels.">
+              <span class="n">01</span>
+              <span>
+                <h3>Track a channel</h3>
+                <p>Paste a YouTube URL. New publishes show up in Pending — including while your laptop is shut.</p>
+              </span>
+            </button>
+            <button class="how-step" type="button" role="listitem"
+              data-src="shots/pending.png"
+              data-pos="top"
+              data-cap="02 · The queue fills"
+              data-alt="Pending inbox of new videos with category chips.">
+              <span class="n">02</span>
+              <span>
+                <h3>The queue fills</h3>
+                <p>Titles, duration, category. An inbox, not a notification pile.</p>
+              </span>
+            </button>
+            <button class="how-step" type="button" role="listitem" aria-current="true"
+              data-src="shots/pending.png"
+              data-pos="center"
+              data-cap="03 · You triage"
+              data-alt="Pending queue with two videos selected for Gemini or discard.">
+              <span class="n">03</span>
+              <span>
+                <h3>You triage</h3>
+                <p>Process what is worth a note. Discard the rest. You are the editor.</p>
+              </span>
+            </button>
+            <button class="how-step" type="button" role="listitem"
+              data-src="shots/pending.png"
+              data-pos="top"
+              data-cap="04 · Helper fetches the transcript"
+              data-alt="Helper pill showing the local helper is on.">
+              <span class="n">04</span>
+              <span>
+                <h3>Helper fetches the transcript</h3>
+                <p>A native helper on your machine does the fetch. Cloud IPs get blocked. Yours does not.</p>
+              </span>
+            </button>
+            <button class="how-step" type="button" role="listitem"
+              data-src="shots/note.png"
+              data-pos="top"
+              data-cap="05 · Gemini writes a shaped note"
+              data-alt="Markdown note with a tactical SOP extracted from a video.">
+              <span class="n">05</span>
+              <span>
+                <h3>Gemini writes a shaped note</h3>
+                <p>Category chooses the instrument: SOP, white space, framework, or roundup. You copy Markdown, send Telegram, or wait for the daily mail.</p>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="features" id="features">
+      <div class="wrap">
+        <div class="features-head">
+          <p class="eyebrow">What you do</p>
+          <h2>Six verbs. No dashboard theater.</h2>
+        </div>
+
+        <article class="feat">
+          <div class="feat-copy">
+            <div class="feat-kicker">01 · Track</div>
+            <h3>Track the channels that actually matter</h3>
+            <p>A short list, not a subscription dump. Each channel carries a category so the next video already knows what kind of note to become.</p>
+          </div>
+          <figure class="well">
+            <img src="shots/channels.png" alt="Channels tab: four tracked channels with categories."  />
+          </figure>
+        </article>
+
+        <article class="feat reverse">
+          <div class="feat-copy">
+            <div class="feat-kicker">02 · Triage</div>
+            <h3>Clear Pending like an inbox</h3>
+            <p>Filter by category or channel. Select a handful. Process, or discard. Human-in-the-loop is the point.</p>
+          </div>
+          <figure class="well">
+            <img src="shots/pending.png" alt="Pending list with category filters and bulk actions."  />
+          </figure>
+        </article>
+
+        <article class="feat wide">
+          <div class="feat-copy">
+            <div class="feat-kicker">03 · Pick</div>
+            <h3>Pick from the grid, skip the webhook</h3>
+            <p>On YouTube, select several videos in one pass and send them to Pending. For the archive, not only the upload that just dropped.</p>
+          </div>
+          <figure class="well">
+            <img src="shots/pick.png" alt="YouTube grid with three videos outlined in pick mode."  />
+          </figure>
+        </article>
+
+        <article class="feat">
+          <div class="feat-copy">
+            <div class="feat-kicker">04 · Extract</div>
+            <h3>The prompt changes with the video</h3>
+            <p>Tactical becomes an SOP. Ideation becomes white space and takes. Strategy becomes models and frameworks. News becomes a briefing. Same pipeline, different instrument.</p>
+            <img class="crop" src="shots/chips.png" alt="Category chips: Tactical and Ideation selected."  />
+          </div>
+          <figure class="well">
+            <img src="shots/note.png" alt="A tactical note with goal, stack, and SOP."  />
+          </figure>
+        </article>
+
+        <article class="feat reverse">
+          <div class="feat-copy">
+            <div class="feat-kicker">05 · Keep</div>
+            <h3>The note is a file</h3>
+            <p>Copy Markdown, save the transcript, open the video. If this project vanished tomorrow, your notes would still open.</p>
+          </div>
+          <figure class="well">
+            <img src="shots/history.png" alt="History tab with Save markdown and Save transcript."  />
+          </figure>
+        </article>
+
+        <article class="feat quiet">
+          <div class="feat-copy">
+            <div class="feat-kicker">06 · Receive</div>
+            <h3>Telegram when it finishes. Mail at the end of the day.</h3>
+            <p>Optional. The library lives in History either way.</p>
+          </div>
+        </article>
+
+        <p class="footnote">Branching — isolated Gemini follow-ups from a note — is in development and not part of this launch.</p>
+      </div>
+    </section>
+
+    <section class="cats" id="shapes">
+      <div class="wrap">
+        <p class="eyebrow">Why the note is not a summary</p>
+        <h2>Four shapes. On purpose.</h2>
+        <div class="cat-grid">
+          <article class="cat">
+            <h3>Tactical</h3>
+            <p>Goal, tools, click-by-click SOP, mechanics, pitfalls.</p>
+          </article>
+          <article class="cat">
+            <h3>Ideation</h3>
+            <p>White space, niche, contrarian takes, case studies, mental models.</p>
+          </article>
+          <article class="cat">
+            <h3>Strategy</h3>
+            <p>Old way / new way, frameworks, red flags, next steps.</p>
+          </article>
+          <article class="cat">
+            <h3>News/Roundup</h3>
+            <p>Headlines, sources, the take if there is one.</p>
+          </article>
+        </div>
+        <p class="cats-foot">A tutorial and a strategy talk should not produce the same document.</p>
+      </div>
+    </section>
+
+    <section class="local" id="local">
+      <div class="wrap">
+        <p class="eyebrow">Why it runs on your machine</p>
+        <h2>YouTube will not give transcripts to a cloud IP. So the worker is you.</h2>
+        <p class="lede">A helper on your computer fetches the transcript and talks to Gemini with your key. The queue can live in your Cloudflare worker. Nothing about this product phones home. We collect an email only if you join the waitlist.</p>
+        <ul class="facts">
+          <li>Queue fills in the cloud. Notes are written locally.</li>
+          <li>Your Gemini key. Your worker. Your helper.</li>
+          <li>No product analytics.</li>
+        </ul>
+        <p><a href="privacy.html">Privacy</a></p>
+      </div>
+    </section>
+
+    <section class="setup" id="setup">
+      <div class="wrap">
+        <p class="eyebrow">Get started</p>
+        <h2>Three steps. Named, because hiding them would be a lie.</h2>
+        <ol class="setup-grid">
+          <li class="setup-card">
+            <span class="n">01</span>
+            <h3>Get the files</h3>
+            <p>Open the <a href="https://github.com/nspage/ingestor">GitHub repo</a> and download or clone it.</p>
+          </li>
+          <li class="setup-card">
+            <span class="n">02</span>
+            <h3>Add it to Chrome</h3>
+            <p>Open <code>chrome://extensions</code>, turn on Developer mode, and choose the <code>chrome-extension</code> folder.</p>
+          </li>
+          <li class="setup-card">
+            <span class="n">03</span>
+            <h3>Start the helper</h3>
+            <p>Run <code>npm run helper:install</code>, then start the helper from the panel.</p>
+          </li>
+        </ol>
+        <p class="setup-aside">Gemini key and your worker URL go in <code>.env</code> — the README walks through it. If that already sounds like a no, the waitlist is the other door.</p>
+      </div>
+    </section>
+
+    <section class="wait" id="waitlist">
+      <div class="wrap">
+        <div class="wait-box">
+          <p class="eyebrow">Waitlist</p>
+          <h2>Want it when it is a packaged install?</h2>
+          <p class="sub">Same product. Less ceremony. We email when that exists — not a newsletter.</p>
+          <form id="waitlist-form">
+            <label class="hp" aria-hidden="true">Company <input type="text" name="company" tabindex="-1" autocomplete="off" /></label>
+            <input type="email" name="email" required placeholder="you@company.com" autocomplete="email" />
+            <button class="btn btn-coral" type="submit">Join the waitlist</button>
+          </form>
+          <p class="fine">Email only, for this product. See <a href="privacy.html">privacy</a>.</p>
+          <p id="waitlist-msg" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="faq" id="faq">
+      <div class="wrap">
+        <p class="eyebrow">FAQ</p>
+        <h2>Before you start.</h2>
+        <details>
+          <summary>I already ask Gemini about videos. Why this?</summary>
+          <p>Gemini has no memory of your channel list and no inbox. This is the layer in front: track, triage, then talk to Gemini with the transcript already in context.</p>
+        </details>
+        <details>
+          <summary>Does it work when my laptop is off?</summary>
+          <p>The queue, yes. New publishes still land in Pending. Notes, no. Synthesis waits until the helper is running. That is the inbox rhythm.</p>
+        </details>
+        <details>
+          <summary>Is the helper watching me?</summary>
+          <p>It fetches transcripts and talks to Gemini for videos you process. It does not include product analytics. The waitlist form is the only time this site stores an email. <a href="privacy.html">Privacy</a>.</p>
+        </details>
+        <details>
+          <summary>Gemini Web or the API?</summary>
+          <p>Both. Process in the Gemini tab you already use, or via the API from the panel. Same queue.</p>
+        </details>
+        <details>
+          <summary>What about Chrome Web Store?</summary>
+          <p>Not this launch. Get the extension from GitHub, or waitlist for a packaged install.</p>
+        </details>
+        <details>
+          <summary>Is this affiliated with YouTube or Google?</summary>
+          <p>No. They are the stack the tool talks to.</p>
+        </details>
+        <details>
+          <summary>Branching?</summary>
+          <p>In development. A footnote, not the product.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap">
+      <div class="foot-top">
+        <div class="foot-brand">
+          <a class="wordmark" href="./">ingestor</a>
+          <p class="muted">A Cool Cool Cool tool.</p>
+        </div>
+        <ul class="foot-links">
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="https://github.com/nspage/ingestor#readme">Docs</a></li>
+          <li><a href="privacy.html">Privacy</a></li>
+          <li><a href="https://github.com/nspage/ingestor">GitHub</a></li>
+        </ul>
+        <div class="foot-cta">
+          <a class="btn btn-ghost" href="#waitlist">Join the waitlist</a>
+          <a class="btn btn-ink" data-github href="https://github.com/nspage/ingestor">Get the extension</a>
+        </div>
+      </div>
+      <p class="legal">© 2026 Nicolas S. Page. Not affiliated with YouTube, Google, or Cloudflare.</p>
+    </div>
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>

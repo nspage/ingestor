@@ -1,0 +1,17 @@
+services:
+  trigger-worker:
+    build: .
+    container_name: yt-pipeline-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Optional: Mount the source code so you don't need to rebuild 
+      # the image every time you change a script file.
+      - ./src:/app/src
+    environment:
+      - HOST=0.0.0.0
+    ports:
+      - "127.0.0.1:3000:3000"
+    # The command is handled by the Dockerfile CMD, but you can override here if needed
+    # command: npm run dev

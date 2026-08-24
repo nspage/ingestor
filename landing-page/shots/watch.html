@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Watch — shot</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 1280px; height: 800px; overflow: hidden; background: #0f0f0f; color: #f1f1f1; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .bar { height: 56px; border-bottom: 1px solid #272727; display: flex; align-items: center; padding: 0 24px; }
+    .mark { font-weight: 700; font-size: 16px; }
+    .layout { display: grid; grid-template-columns: 1fr 360px; gap: 24px; padding: 20px 24px; }
+    .player { background: #000; border-radius: 12px; height: 486px; display: flex; align-items: center; justify-content: center; color: #555; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .row { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; gap: 12px; }
+    h1 { font-size: 18px; margin: 0; font-weight: 650; }
+    .antigravity-btn {
+      background: #6b75d6; color: #fff; border-radius: 18px; padding: 0 14px; height: 36px;
+      font-size: 13px; font-weight: 600; border: none; font-family: inherit; white-space: nowrap;
+    }
+    .channel { color: #aaa; margin-top: 6px; }
+    .side .item { display: flex; gap: 10px; margin-bottom: 14px; }
+    .st { width: 168px; height: 94px; background: #212121; border-radius: 8px; flex: none; }
+  </style>
+</head>
+<body>
+  <div class="bar"><div class="mark">YouTube</div></div>
+  <div class="layout">
+    <div>
+      <div class="player">Studio Hours</div>
+      <div class="row">
+        <h1>Ship agents without a demo-day architecture</h1>
+        <button class="antigravity-btn">Send to pipeline</button>
+      </div>
+      <div class="channel">Studio Hours · 28,412 views · 2 hours ago</div>
+    </div>
+    <div class="side">
+      <div class="item"><div class="st"></div><div>Where AI wrappers still have white space<br><span style="color:#aaa">Compound</span></div></div>
+      <div class="item"><div class="st"></div><div>Old GTM vs new GTM<br><span style="color:#aaa">Operator Notes</span></div></div>
+      <div class="item"><div class="st"></div><div>This week’s model drops, ranked<br><span style="color:#aaa">The Roundup</span></div></div>
+      <div class="item"><div class="st"></div><div>A production eval harness you can copy<br><span style="color:#aaa">Studio Hours</span></div></div>
+    </div>
+  </div>
+</body>
+</html>

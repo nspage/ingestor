@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 220" width="1120" height="220" fill="none">
+  <style>
+    .n { font: 600 14px Inter, -apple-system, sans-serif; fill: #1b1b1b; }
+    .d { font: 400 12px Inter, -apple-system, sans-serif; fill: #5f5e64; }
+    .k { font: 500 11px "JetBrains Mono", ui-monospace, monospace; fill: #ff7759; letter-spacing: 0.08em; }
+  </style>
+  <rect width="1120" height="220" fill="#f9f9f9"/>
+  <g>
+    <rect x="8" y="28" width="196" height="164" rx="16" fill="#fff" stroke="#d9d9dd"/>
+    <text class="k" x="28" y="56">01</text>
+    <text class="n" x="28" y="86">Track</text>
+    <text class="d" x="28" y="112">Paste a channel URL.</text>
+    <text class="d" x="28" y="130">Category rides along.</text>
+  </g>
+  <path d="M212 110h24" stroke="#ff7759" stroke-width="1.5"/>
+  <g>
+    <rect x="236" y="28" width="196" height="164" rx="16" fill="#fff" stroke="#d9d9dd"/>
+    <text class="k" x="256" y="56">02</text>
+    <text class="n" x="256" y="86">Queue fills</text>
+    <text class="d" x="256" y="112">Publishes land in Pending</text>
+    <text class="d" x="256" y="130">even if you are away.</text>
+  </g>
+  <path d="M440 110h24" stroke="#ff7759" stroke-width="1.5"/>
+  <g>
+    <rect x="464" y="28" width="196" height="164" rx="16" fill="#fff" stroke="#ff7759"/>
+    <text class="k" x="484" y="56">03</text>
+    <text class="n" x="484" y="86">You triage</text>
+    <text class="d" x="484" y="112">Process or discard.</text>
+    <text class="d" x="484" y="130">You are the editor.</text>
+  </g>
+  <path d="M668 110h24" stroke="#ff7759" stroke-width="1.5"/>
+  <g>
+    <rect x="692" y="28" width="196" height="164" rx="16" fill="#fff" stroke="#d9d9dd"/>
+    <text class="k" x="712" y="56">04</text>
+    <text class="n" x="712" y="86">Helper fetches</text>
+    <text class="d" x="712" y="112">Transcript on your</text>
+    <text class="d" x="712" y="130">machine, not a cloud IP.</text>
+  </g>
+  <path d="M896 110h24" stroke="#ff7759" stroke-width="1.5"/>
+  <g>
+    <rect x="920" y="28" width="192" height="164" rx="16" fill="#fff" stroke="#d9d9dd"/>
+    <text class="k" x="940" y="56">05</text>
+    <text class="n" x="940" y="86">Shaped note</text>
+    <text class="d" x="940" y="112">SOP, framework, or</text>
+    <text class="d" x="940" y="130">briefing. Then a file.</text>
+  </g>
+</svg>

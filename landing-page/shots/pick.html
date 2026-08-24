@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Pick mode — shot</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 1280px; height: 800px; overflow: hidden; background: #0f0f0f; color: #f1f1f1; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .bar { height: 56px; background: #0f0f0f; border-bottom: 1px solid #272727; display: flex; align-items: center; padding: 0 24px; gap: 16px; }
+    .mark { font-weight: 700; letter-spacing: -0.02em; font-size: 16px; }
+    .search { flex: 1; max-width: 560px; background: #121212; border: 1px solid #303030; border-radius: 40px; padding: 8px 16px; color: #aaa; }
+    .pick-banner { margin-left: auto; background: #17181c; border: 1px solid #6b75d6; color: #ececec; border-radius: 8px; padding: 6px 10px; font-size: 12px; }
+    .pick-banner b { color: #9aa3f0; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; padding: 22px 24px; }
+    .card { border-radius: 12px; }
+    .card.on { outline: 3px solid #6b75d6; outline-offset: 4px; }
+    .thumb { height: 148px; border-radius: 12px; background: #212121; position: relative; }
+    .t1 { background: linear-gradient(135deg, #3d4568, #1c1e28); }
+    .t2 { background: linear-gradient(135deg, #3a4a3a, #1c1e28); }
+    .t3 { background: linear-gradient(135deg, #4a3d38, #1c1e28); }
+    .t4 { background: linear-gradient(135deg, #3a3d4a, #1c1e28); }
+    .t5 { background: linear-gradient(135deg, #2d3a4a, #1c1e28); }
+    .t6 { background: linear-gradient(135deg, #3a2d4a, #1c1e28); }
+    .t7 { background: linear-gradient(135deg, #2d4a3a, #1c1e28); }
+    .t8 { background: linear-gradient(135deg, #4a3a2d, #1c1e28); }
+    .dur { position: absolute; right: 8px; bottom: 8px; background: #000c; padding: 2px 5px; border-radius: 4px; font-size: 11px; }
+    .title { margin: 8px 4px 2px; font-weight: 650; font-size: 14px; }
+    .meta { margin: 0 4px; color: #aaa; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <div class="mark">YouTube</div>
+    <div class="search">Search</div>
+    <div class="pick-banner">Pick mode · <b>3 selected</b> · Send to pipeline</div>
+  </div>
+  <div class="grid">
+    <div class="card on"><div class="thumb t1"><span class="dur">28:14</span></div><div class="title">Ship agents without a demo-day architecture</div><div class="meta">Studio Hours</div></div>
+    <div class="card on"><div class="thumb t2"><span class="dur">41:02</span></div><div class="title">Where AI wrappers still have white space</div><div class="meta">Compound</div></div>
+    <div class="card"><div class="thumb t3"><span class="dur">1:12:08</span></div><div class="title">Old GTM vs new GTM</div><div class="meta">Operator Notes</div></div>
+    <div class="card on"><div class="thumb t4"><span class="dur">18:40</span></div><div class="title">This week’s model drops, ranked</div><div class="meta">The Roundup</div></div>
+    <div class="card"><div class="thumb t5"><span class="dur">22:11</span></div><div class="title">A production eval harness you can copy</div><div class="meta">Studio Hours</div></div>
+    <div class="card"><div class="thumb t6"><span class="dur">33:40</span></div><div class="title">Unbundling the AI intern</div><div class="meta">Compound</div></div>
+    <div class="card"><div class="thumb t7"><span class="dur">54:03</span></div><div class="title">Distribution before product, still</div><div class="meta">Operator Notes</div></div>
+    <div class="card"><div class="thumb t8"><span class="dur">24:12</span></div><div class="title">What actually shipped this week</div><div class="meta">The Roundup</div></div>
+  </div>
+</body>
+</html>

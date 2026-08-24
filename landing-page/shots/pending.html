@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Pending — shot</title>
+  <link rel="stylesheet" href="../../chrome-extension/sidepanel.css" />
+  <link rel="stylesheet" href="_shot.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <div class="brand">Pipeline</div>
+      <div class="status">
+        <button type="button" class="helper-pill on" disabled>
+          <span class="helper-dot"></span>
+          <span>Helper on</span>
+        </button>
+        <span>6 pending</span>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button type="button" class="icon-btn" title="Settings">⚙</button>
+    </div>
+  </header>
+  <nav class="tabs">
+    <button class="tab active">Pending <span class="badge">6</span></button>
+    <button class="tab">Channels <span class="badge">4</span></button>
+    <button class="tab">History <span class="badge">18</span></button>
+  </nav>
+  <section class="view active" style="display:block">
+    <div class="inbox-row">
+      <div class="inbox-meta">3 new since you last opened</div>
+      <button type="button" class="text-btn">Select all</button>
+    </div>
+    <div class="filter-block">
+      <div class="filter-label">Categories</div>
+      <div class="filters">
+        <button class="chip cat on">Tactical</button>
+        <button class="chip cat on">Ideation</button>
+        <button class="chip cat on">Strategy</button>
+        <button class="chip cat on">News/Roundup</button>
+      </div>
+    </div>
+    <div class="bulk">
+      <span>2 selected</span>
+      <button type="button" class="btn process">Gemini</button>
+      <button type="button" class="text-btn">API Process</button>
+      <button type="button" class="btn discard">Discard</button>
+    </div>
+    <div class="list">
+      <article class="card">
+        <input type="checkbox" checked />
+        <div class="thumb" data-cat="Tactical">28:14</div>
+        <div>
+          <div class="title">Ship agents without a demo-day architecture</div>
+          <div class="meta">Studio Hours · 28:14 · 2h ago</div>
+          <div class="meta"><select class="card-cat"><option>Tactical</option></select></div>
+          <div class="row-actions">
+            <button class="btn process">Gemini</button>
+            <button class="change">API Process</button>
+            <button class="btn discard">Discard</button>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <input type="checkbox" checked />
+        <div class="thumb" data-cat="Ideation">41:02</div>
+        <div>
+          <div class="title">Where AI wrappers still have white space</div>
+          <div class="meta">Compound · 41:02 · 5h ago</div>
+          <div class="meta"><select class="card-cat"><option>Ideation</option></select></div>
+          <div class="row-actions">
+            <button class="btn process">Gemini</button>
+            <button class="change">API Process</button>
+            <button class="btn discard">Discard</button>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <input type="checkbox" />
+        <div class="thumb" data-cat="Strategy">1:12</div>
+        <div>
+          <div class="title">Old GTM vs new GTM</div>
+          <div class="meta">Operator Notes · 1:12:08 · Yesterday</div>
+          <div class="meta"><select class="card-cat"><option>Strategy</option></select></div>
+          <div class="row-actions">
+            <button class="btn process">Gemini</button>
+            <button class="change">API Process</button>
+            <button class="btn discard">Discard</button>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <input type="checkbox" />
+        <div class="thumb" data-cat="News">18:40</div>
+        <div>
+          <div class="title">This week’s model drops, ranked</div>
+          <div class="meta">The Roundup · 18:40 · Yesterday</div>
+          <div class="meta"><select class="card-cat"><option>News/Roundup</option></select></div>
+          <div class="row-actions">
+            <button class="btn process">Gemini</button>
+            <button class="change">API Process</button>
+            <button class="btn discard">Discard</button>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+</body>
+</html>

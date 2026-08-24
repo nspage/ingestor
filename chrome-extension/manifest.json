@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "YT LLM Pipeline Assistant",
+  "version": "2.15",
+  "description": "Review YouTube videos and send them through your local knowledge pipeline.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArUB961Dd0DqtheVuNedjxmDbXT0ur+bwRvvuxa1gpLS4SuQYkYOa5WnDrF7tpusbXCPRngWYx9Tv9sWns7DNT8dQtFmmS4sqeRvjLpJ/dLNDiODsW6mJorO5zVrLYXeykiyLqcgqBp8pN7CCAKl57dq2v4xUROwibA2wEM/DYwotay2kItqhDBU+E+K8UkDMEFPUTUMidJwv7Gpk+POB7W89N5qK+Gd9kX7YUUOOY7cgEv106353opw0CbibV7SyWZD8hfMML6KPZiHWQT76i8n+3hwVgJu6oe21AOqAg9Fd1pTD2eWIpC7lhrhdSADtyD+uXi1my0w2ZB1Jy0N2gwIDAQAB",
+  "permissions": [
+    "storage",
+    "nativeMessaging",
+    "sidePanel",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "https://*.youtube.com/*",
+    "https://gemini.google.com/*",
+    "https://*.workers.dev/*",
+    "https://img.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["gemini.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Open Pipeline"
+  },
+  "commands": {
+    "toggle-pipeline": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Open or close the pipeline side panel"
+    },
+    "pick-videos": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+1",
+        "mac": "Command+Shift+1"
+      },
+      "description": "Pick YouTube videos to send to Pending"
+    }
+  }
+}

@@ -1,0 +1,63 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.venv/
+**/.venv/
+**/.thumbnails/
+**/.waveform-cache/
+.DS_Store
+dist/
+renders/
+*.log
+
+# Media assets
+*.mp4
+*.wav
+*.mp3
+*.ac3
+*.m4a
+*.ogg
+
+# Backups and temp files
+*.bak
+*.tmp
+*~
+
+# Python
+venv/
+ENV/
+env/
+**/__pycache__/
+*.pyc
+*.pem
+
+# Local Cloudflare / wrangler
+worker/wrangler.toml
+worker/.wrangler/
+.dev.vars
+
+# Personal data dumps (live in KV; keep local copies)
+channels.json
+channels_backup.json
+categories.json
+
+# Not the public product
+.agents/
+skills-lock.json
+feature-promo/
+feature-promo-portrait/
+promo-video/
+promo-video-portrait/
+hyperframes-projects/
+soundsprite/
+architecture.html
+architecture.json
+pipeline-presentation.html
+GEMINI.md
+docs/operational-manual copy.md
+docs/CHROMEWEBSTORE.md
+docs/WEBHOOK_INTEGRATION.md
+landing-page/BRIEF.md
+landing-page/copy.md
+*.code-workspace

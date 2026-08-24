@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Pipeline</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <div class="brand">Pipeline</div>
+      <div id="status-line" class="status">
+        <button type="button" id="helper-pill" class="helper-pill off" aria-live="polite" title="Start helper">
+          <span class="helper-dot" aria-hidden="true"></span>
+          <span id="helper-label">Checking…</span>
+        </button>
+        <span id="status-meta"></span>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button type="button" id="start-btn" class="ghost hidden">Start helper</button>
+      <button type="button" id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="pending">Pending <span id="pending-count" class="badge">0</span></button>
+    <button class="tab" data-tab="channels">Channels <span id="channels-count" class="badge">0</span></button>
+    <button class="tab" data-tab="history">History <span id="history-count" class="badge">0</span></button>
+  </nav>
+
+  <section id="view-pending" class="view active">
+    <div class="inbox-row">
+      <div id="inbox-meta" class="inbox-meta"></div>
+      <button type="button" id="select-all" class="text-btn">Select all</button>
+    </div>
+    <div class="filter-block">
+      <div class="filter-label">Categories</div>
+      <div id="cat-filters" class="filters"></div>
+    </div>
+    <div class="filter-block">
+      <button type="button" id="toggle-channels" class="filter-toggle">Channels</button>
+      <div id="chan-filters" class="filters hidden"></div>
+    </div>
+    <div id="bulk-bar" class="bulk hidden">
+      <span id="bulk-label">0 selected</span>
+      <button type="button" id="bulk-gemini" class="btn process">Gemini</button>
+      <button type="button" id="bulk-process" class="text-btn">API Process</button>
+      <button type="button" id="bulk-discard" class="btn discard">Discard</button>
+    </div>
+    <div id="needs-cat" class="needs-cat hidden">
+      <div class="needs-cat-hd">
+        <span id="needs-cat-label">Needs a category</span>
+        <div class="needs-cat-actions">
+          <select id="needs-cat-select"></select>
+          <button type="button" id="needs-cat-apply" class="btn process">Apply to all</button>
+        </div>
+      </div>
+      <div id="needs-cat-list" class="list"></div>
+    </div>
+    <div id="pending-list" class="list"></div>
+    <button type="button" id="show-older" class="text-btn hidden">Show older</button>
+  </section>
+
+  <section id="view-channels" class="view">
+    <div class="add-row">
+      <input id="channel-url" type="text" placeholder="YouTube channel URL" />
+      <select id="channel-cat"></select>
+      <button type="button" id="track-btn" class="btn process">Track</button>
+    </div>
+    <div id="channels-list" class="list"></div>
+  </section>
+
+  <section id="view-history" class="view">
+    <div class="inbox-row">
+      <input id="history-search" class="search" type="search" placeholder="Search title or channel" />
+      <button type="button" id="history-select-all" class="text-btn">Select all</button>
+    </div>
+    <div id="history-cat-block" class="filter-block hidden">
+      <div class="filter-label">Categories</div>
+      <div id="history-cat-filters" class="filters"></div>
+    </div>
+    <div class="filter-block">
+      <div class="filter-label">Source</div>
+      <div id="history-source-filters" class="filters"></div>
+    </div>
+    <div class="filter-block">
+      <div class="filter-label">Description</div>
+      <div id="history-desc-filters" class="filters"></div>
+    </div>
+    <div id="history-bulk" class="bulk hidden">
+      <span id="history-bulk-label">0 selected</span>
+      <button type="button" id="history-save-md" class="btn process">Save .md</button>
+      <button type="button" id="history-save-tr" class="btn process">Save transcript</button>
+      <button type="button" id="history-synth" class="btn process">Synthesize</button>
+      <button type="button" id="history-open" class="text-btn">Open videos</button>
+    </div>
+    <div id="synth-sheet" class="synth-sheet hidden">
+      <textarea id="synth-input" rows="3" placeholder="Contrast these frameworks…"></textarea>
+      <button type="button" id="synth-send" class="btn process">Gemini</button>
+    </div>
+    <div id="failed-list" class="list"></div>
+    <div id="history-list" class="list"></div>
+  </section>
+
+  <section id="view-settings" class="view">
+    <label class="setting-row" for="send-tg">
+      <span>Send finished notes to Telegram</span>
+      <input type="checkbox" id="send-tg" />
+    </label>
+    <h3>Categorisation prompt</h3>
+    <textarea id="sys-prompt" rows="6"></textarea>
+    <select id="sys-model"></select>
+    <button type="button" id="save-prompt" class="btn process">Save prompt</button>
+    <h3>Categories</h3>
+    <div class="add-row">
+      <input id="new-cat-name" type="text" placeholder="New category" />
+      <button type="button" id="add-cat" class="btn process">Add</button>
+    </div>
+    <div id="settings-cats" class="list"></div>
+  </section>
+
+  <section id="view-note" class="view note-view">
+    <div id="note-scroll" class="note-scroll">
+      <button type="button" id="note-back" class="text-btn">← History</button>
+      <h1 id="note-title" class="note-title"></h1>
+      <nav id="branch-nav" class="branch-nav hidden"></nav>
+      <div id="note-meta" class="meta"></div>
+      <div class="row-actions note-toolbar">
+        <div class="doc-mode" role="tablist">
+          <button type="button" id="doc-note" class="doc-mode-btn on" role="tab">Note</button>
+          <button type="button" id="doc-transcript" class="doc-mode-btn" role="tab">Transcript</button>
+        </div>
+        <label id="ts-toggle" class="ts-toggle hidden">
+          <input type="checkbox" id="show-ts" />
+          Timestamps
+        </label>
+        <button type="button" id="note-copy" class="btn discard">Copy markdown</button>
+        <button type="button" id="note-video" class="text-btn">Open video</button>
+      </div>
+      <section id="desc-draft" class="desc-draft hidden">
+        <div class="desc-draft-hd">
+          <span>Description</span>
+          <div class="desc-draft-modes">
+            <button type="button" id="desc-edit" class="doc-mode-btn on">Edit</button>
+            <button type="button" id="desc-preview" class="doc-mode-btn">Preview</button>
+          </div>
+        </div>
+        <textarea id="desc-editor" rows="8"></textarea>
+        <article id="desc-preview-body" class="md hidden"></article>
+        <div class="row-actions">
+          <button type="button" id="desc-add" class="btn process">Add to note</button>
+          <button type="button" id="desc-dismiss" class="btn discard">Dismiss</button>
+        </div>
+      </section>
+      <section id="desc-added" class="desc-added hidden">
+        <div class="desc-draft-hd">
+          <span>Description</span>
+          <button type="button" id="desc-reedit" class="text-btn">Edit</button>
+        </div>
+        <article id="desc-added-body" class="md"></article>
+      </section>
+      <nav id="turn-nav" class="turn-nav hidden"></nav>
+      <div id="note-thread" class="thread hidden"></div>
+      <article id="note-body" class="md"></article>
+    </div>
+    <footer id="note-composer" class="note-composer hidden">
+      <!-- Follow-up mode (default) -->
+      <div id="composer-followup">
+        <div class="composer-hd">
+          <span>Follow up</span>
+          <button type="button" id="composer-tall" class="text-btn">Half height</button>
+        </div>
+        <textarea id="composer-input" rows="3" placeholder="Write a follow-up. Click copies. Option-click inserts."></textarea>
+        <div class="composer-actions">
+          <button type="button" id="composer-send" class="btn process">Send</button>
+          <button type="button" id="composer-branch-toggle" class="btn branch">Branch</button>
+        </div>
+      </div>
+
+      <!-- Branch mode -->
+      <div id="composer-branch" class="hidden">
+        <div class="composer-hd branch-hd">
+          <span>Branch · <span id="branch-count">0</span>/3</span>
+          <div>
+            <button type="button" id="branch-add" class="text-btn">+ Add</button>
+            <button type="button" id="branch-back" class="text-btn">Back</button>
+          </div>
+        </div>
+        <div id="branch-list" class="branch-list"></div>
+        <div class="composer-actions">
+          <button type="button" id="branch-send" class="btn branch">Send all</button>
+        </div>
+        <div id="branch-progress" class="branch-progress hidden"></div>
+      </div>
+    </footer>
+  </section>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+{
+  "name": "ingestor",
+  "version": "1.0.0",
+  "description": "Local-first YouTube inbox: queue videos, extract transcripts, turn them into Markdown notes with Gemini.",
+  "author": "Nicolas S. Page",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nspage/ingestor.git"
+  },
+  "scripts": {
+    "start": "ts-node src/webapp/index.ts",
+    "dev": "ts-node src/webapp/index.ts",
+    "dev:web": "ts-node src/webapp/index.ts",
+    "start:web": "ts-node src/webapp/index.ts",
+    "helper:install": "bash scripts/install-helper.sh",
+    "helper:uninstall": "bash scripts/uninstall-helper.sh"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@hono/node-server": "^1.19.7",
+    "@trigger.dev/sdk": "4.4.6",
+    "@types/marked": "^5.0.2",
+    "dotenv": "^16.4.5",
+    "hono": "^4.11.3",
+    "marked": "^18.0.3",
+    "resend": "^6.6.0",
+    "rss-parser": "^3.13.0",
+    "youtube-transcript": "^1.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "trigger.dev": "^3.0.0-beta.46",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.3"
+  },
+  "keywords": [
+    "trigger.dev",
+    "youtube",
+    "gemini",
+    "automation",
+    "local-first"
+  ]
+}
