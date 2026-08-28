@@ -2,13 +2,13 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Pipeline</title>
+  <title>ingestor</title>
   <link rel="stylesheet" href="sidepanel.css" />
 </head>
 <body>
   <header class="top">
     <div>
-      <div class="brand">Pipeline</div>
+      <div class="brand">ingestor</div>
       <div id="status-line" class="status">
         <button type="button" id="helper-pill" class="helper-pill off" aria-live="polite" title="Start helper">
           <span class="helper-dot" aria-hidden="true"></span>
@@ -74,7 +74,11 @@
   <section id="view-history" class="view">
     <div class="inbox-row">
       <input id="history-search" class="search" type="search" placeholder="Search title or channel" />
-      <button type="button" id="history-select-all" class="text-btn">Select all</button>
+      <div class="inbox-actions">
+        <button type="button" id="history-select-all" class="text-btn">Select all</button>
+        <button type="button" id="history-export-notes" class="text-btn">Export notes</button>
+        <button type="button" id="history-export-transcripts" class="text-btn">Export transcripts</button>
+      </div>
     </div>
     <div id="history-cat-block" class="filter-block hidden">
       <div class="filter-label">Categories</div>
@@ -90,14 +94,8 @@
     </div>
     <div id="history-bulk" class="bulk hidden">
       <span id="history-bulk-label">0 selected</span>
-      <button type="button" id="history-save-md" class="btn process">Save .md</button>
-      <button type="button" id="history-save-tr" class="btn process">Save transcript</button>
-      <button type="button" id="history-synth" class="btn process">Synthesize</button>
       <button type="button" id="history-open" class="text-btn">Open videos</button>
-    </div>
-    <div id="synth-sheet" class="synth-sheet hidden">
-      <textarea id="synth-input" rows="3" placeholder="Contrast these frameworks…"></textarea>
-      <button type="button" id="synth-send" class="btn process">Gemini</button>
+      <button type="button" id="history-delete" class="btn discard">Delete</button>
     </div>
     <div id="failed-list" class="list"></div>
     <div id="history-list" class="list"></div>

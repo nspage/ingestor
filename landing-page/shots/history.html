@@ -9,7 +9,7 @@
 <body>
   <header class="top">
     <div>
-      <div class="brand">Pipeline</div>
+      <div class="brand">ingestor</div>
       <div class="status">
         <button type="button" class="helper-pill on" disabled>
           <span class="helper-dot"></span>
@@ -29,7 +29,11 @@
   <section class="view active" style="display:block">
     <div class="inbox-row">
       <input class="search" type="search" placeholder="Search title or channel" value="" readonly />
-      <button type="button" class="text-btn">Select all</button>
+      <div class="inbox-actions">
+        <button type="button" class="text-btn">Select all</button>
+        <button type="button" class="text-btn">Export 1 note</button>
+        <button type="button" class="text-btn">Export 1 transcript</button>
+      </div>
     </div>
     <div class="filter-block">
       <div class="filter-label">Source</div>
@@ -41,9 +45,8 @@
     </div>
     <div class="bulk">
       <span>1 selected</span>
-      <button type="button" class="btn process">Save .md</button>
-      <button type="button" class="btn process">Save transcript</button>
       <button type="button" class="text-btn">Open videos</button>
+      <button type="button" class="btn discard">Delete</button>
     </div>
     <div class="list">
       <article class="card">

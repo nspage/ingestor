@@ -110,7 +110,7 @@ function paintDoc() {
   $("note-title").textContent = video.title || video.videoId;
   paintBranchNav(video);
   $("note-meta").textContent = [
-    isSynthNote(video) ? "Synthesis" : isBranchNote(video) ? "Branch" : video.channelName,
+    isSynthNote(video) ? "Synthesis" : isBranchNote(video) ? "Branch" : videoChannelLabel(video),
     video.category,
     formatWhen(video.processedAt),
     video.analysisSource === "gemini-web" ? "Gemini" : "",
@@ -805,13 +805,28 @@ function decodeHtmlName(value) {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
+}
+
+function isPlaceholderChannelName(name) {
+  const trimmed = decodeHtmlName(name).trim();
+  if (!trimmed) return true;
+  if (/^(unknown channel|unknown|visit source|youtube video feed|youtube|untitled)$/i.test(trimmed)) return true;
+  return /^channel-\d+$/i.test(trimmed);
+}
+
+function videoChannelLabel(video) {
+  const stored = decodeHtmlName(video?.channelName).trim();
+  const fromList = decodeHtmlName(channelName(video?.channelId)).trim();
+  if (!isPlaceholderChannelName(stored)) return stored;
+  if (!isPlaceholderChannelName(fromList)) return fromList;
+  return fromList || stored || "";
 }
 
 function channelCardName(ch) {
   const name = decodeHtmlName(ch.name).trim();
-  const placeholder = !name || /^(visit source|unknown channel|unknown|youtube video feed|youtube|untitled)$/i.test(name) || /^channel-\d+$/i.test(name);
-  return placeholder ? (ch.id || name) : name;
+  return isPlaceholderChannelName(name) ? (ch.id || name) : name;
 }
 
 function lastActivity(channelId) {
@@ -855,7 +870,7 @@ async function startHelperFromUi() {
 
 function renderFilters() {
   const cats = [...new Set(ui.queue.map((v) => v.category).filter(Boolean))];
-  const chans = [...new Set(ui.queue.map((v) => v.channelName || channelName(v.channelId)).filter(Boolean))];
+  const chans = [...new Set(ui.queue.map((v) => videoChannelLabel(v)).filter(Boolean))];
   const catBox = $("cat-filters");
   const chanBox = $("chan-filters");
   const toggle = $("toggle-channels");
@@ -918,7 +933,7 @@ function visibleQueue() {
   let list = [...ui.queue].filter((v) => !needsCategory(v)).sort((a, b) => videoTime(b) - videoTime(a));
   if (ui.filter.type === "category") list = list.filter((v) => v.category === ui.filter.value);
   if (ui.filter.type === "channel") {
-    list = list.filter((v) => (v.channelName || channelName(v.channelId)) === ui.filter.value);
+    list = list.filter((v) => videoChannelLabel(v) === ui.filter.value);
   }
   const recent = list.filter((v) => now - videoTime(v) <= WEEK_MS);
   const older = list.filter((v) => now - videoTime(v) > WEEK_MS);
@@ -979,7 +994,7 @@ function pendingCard(video) {
     <img class="thumb" alt="" src="${thumbUrl(video.videoId)}" />
     <div>
       <div class="title" data-open="${video.videoUrl}">${video.title || video.videoId}</div>
-      <div class="meta">${video.channelName || channelName(video.channelId) || "Unknown"} · ${video.duration || "?"} · ${formatWhen(video.publishedAt || video.addedAt)}</div>
+      <div class="meta">${videoChannelLabel(video) || "Unknown"} · ${video.duration || "?"} · ${formatWhen(video.publishedAt || video.addedAt)}</div>
       <div class="meta">${categorySelectHtml(video)} <button class="change" data-copy-desc="${video.videoId}">Copy description</button></div>
       <div class="row-actions">
         <button class="btn process" data-gemini="${video.videoId}">Gemini</button>
@@ -1015,7 +1030,7 @@ function geminiPrefillText(video) {
     || ui.categories.find((c) => c.name && c.name.toLowerCase() === name.toLowerCase());
   const prompt = String(cat?.prompt || "").trim();
   if (!prompt) return videoUrl;
-  const channel = video.channelName || channelName(video.channelId);
+  const channel = videoChannelLabel(video);
   return [
     prompt,
     "",
@@ -1042,7 +1057,7 @@ function openInGemini(video, fromPending) {
     videoId: video.videoId,
     title: video.title,
     channelId: video.channelId,
-    channelName: video.channelName,
+    channelName: videoChannelLabel(video) || video.channelName,
     category: video.category,
     publishedAt: video.publishedAt,
     videoUrl: videoWatchUrl(video),
@@ -1299,7 +1314,7 @@ function historyRows() {
   return ui.history.filter((v) => {
     if (isBranchNote(v) && !q) return false;
 
-    const blob = `${v.title || ""} ${v.channelName || ""}`.toLowerCase();
+    const blob = `${v.title || ""} ${videoChannelLabel(v)}`.toLowerCase();
     if (q && !blob.includes(q)) return false;
     if (category && v.category !== category) return false;
     if (source === "gemini-web" && v.analysisSource !== "gemini-web") return false;
@@ -1341,10 +1356,23 @@ function renderHistoryBulk() {
   const n = selectedHistory().length;
   $("history-bulk").classList.toggle("hidden", n === 0);
   $("history-bulk-label").textContent = `${n} selected`;
-  if (n === 0) $("synth-sheet").classList.add("hidden");
   const rows = historyRows();
   const allOn = rows.length > 0 && rows.every((v) => ui.historySelected.has(v.videoId));
   $("history-select-all").textContent = allOn ? "Deselect all" : "Select all";
+  renderHistoryExport();
+}
+
+function exportTargets() {
+  const selected = selectedHistory();
+  return selected.length ? selected : historyRows();
+}
+
+function renderHistoryExport() {
+  const n = selectedHistory().length;
+  const notesBtn = $("history-export-notes");
+  const trBtn = $("history-export-transcripts");
+  if (notesBtn) notesBtn.textContent = n > 0 ? `Export ${n} note${n === 1 ? "" : "s"}` : "Export notes";
+  if (trBtn) trBtn.textContent = n > 0 ? `Export ${n} transcript${n === 1 ? "" : "s"}` : "Export transcripts";
 }
 
 function toggleHistorySelectAll() {
@@ -1360,95 +1388,126 @@ function selectedHistory() {
   return ui.history.filter((v) => ui.historySelected.has(v.videoId) && visible.has(v.videoId));
 }
 
-function historyMarkdown(vids) {
-  return vids.map((v) => `# ${v.title || v.videoId}\n\n${noteCopyText(v)}`.trim()).join("\n\n---\n\n");
+function exportDateStamp(iso) {
+  const parsed = iso ? new Date(iso) : new Date();
+  const d = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}${mm}${yy}`;
 }
 
-function sanitizeFilename(name) {
-  return String(name || "note")
-    .replace(/[^A-Za-z0-9]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60) || "note";
+function exportTitle(video) {
+  const raw = String(video?.title || video?.videoId || "note")
+    .replace(/[\/\\:*?"<>|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (raw || "note").slice(0, 80);
 }
 
-function downloadText(filename, text) {
+function exportFilename(video, kind = "note") {
+  const suffix = kind === "transcript" ? "-transcript" : "";
+  return `ingestor-${exportDateStamp(video?.processedAt)}-${exportTitle(video)}${suffix}.md`;
+}
+
+function noteMarkdownFile(video) {
+  return `# ${video.title || video.videoId}\n\n${noteCopyText(video)}`.trim();
+}
+
+function transcriptMarkdownFile(video) {
+  const timed = transcriptCues(video).length > 0;
+  return `# ${video.title || video.videoId}\n\n${transcriptCopyText(video, timed)}`.trim();
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function downloadText(filename, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/markdown;charset=utf-8" }));
+  const revoke = () => setTimeout(() => URL.revokeObjectURL(url), 20000);
+  try {
+    if (chrome?.downloads?.download) {
+      await chrome.downloads.download({
+        url,
+        filename,
+        saveAs: false,
+        conflictAction: "uniquify",
+      });
+      revoke();
+      return;
+    }
+  } catch {
+    /* fall through to anchor download */
+  }
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
+  a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(a.href);
+  revoke();
 }
 
-function synthesisPrefill(instruction, vids) {
-  const cap = 8000;
-  const blocks = vids.map((v) => {
-    let body = noteCopyText(v);
-    if (body.length > cap) body = `${body.slice(0, cap)}\n\n[…]`;
-    return `# ${v.title || v.videoId}\n\n${body}`;
-  });
-  return `INSTRUCTION:\n${instruction}\n\n---\n\n${blocks.join("\n\n---\n\n")}`;
+async function downloadNotes(vids, kind = "note") {
+  for (let i = 0; i < vids.length; i++) {
+    const v = vids[i];
+    const text = kind === "transcript" ? transcriptMarkdownFile(v) : noteMarkdownFile(v);
+    await downloadText(exportFilename(v, kind), text);
+    if (i < vids.length - 1) await sleep(80);
+  }
 }
 
-function sendSynthesis() {
-  const instruction = ($("synth-input").value || "").trim();
-  if (!instruction) {
-    toast("Write what you want synthesized.");
+async function saveHistoryMarkdown() {
+  const vids = exportTargets();
+  if (!vids.length) {
+    toast("Nothing to export");
     return;
   }
-  const vids = selectedHistory();
-  if (!vids.length) return;
-  const title = instruction.split("\n")[0].slice(0, 80);
-  const snapshot = {
-    videoId: `syn_${Date.now().toString(36)}`,
-    title,
-    sourceVideoIds: vids.map((v) => v.videoId),
-    category: vids[0]?.category || "",
-  };
-  const session = {
-    videoId: snapshot.videoId,
-    tabId: null,
-    autoImported: false,
-    fromPending: true,
-    processedAt: null,
-    video: snapshot,
-  };
-  chrome.storage.local.set({
-    geminiPrefill: synthesisPrefill(instruction, vids),
-    geminiSession: session,
-  }, () => {
-    chrome.tabs.create({ url: "https://gemini.google.com/app", active: false }, (tab) => {
-      if (tab?.id) bindGeminiOpen(session, tab.id);
-    });
-  });
-  toast("Opened Gemini with the selected notes");
-}
-
-function saveHistoryMarkdown() {
-  const vids = selectedHistory();
-  if (!vids.length) return;
-  const filename = vids.length === 1
-    ? `${sanitizeFilename(vids[0].title || vids[0].videoId)}.md`
-    : `pipeline-notes-${new Date().toISOString().slice(0, 10)}.md`;
-  downloadText(filename, historyMarkdown(vids));
+  await downloadNotes(vids, "note");
   toast(`Saved ${vids.length} note${vids.length === 1 ? "" : "s"}`);
 }
 
-function saveHistoryTranscripts() {
-  const vids = selectedHistory().filter((v) => hasTranscript(v) || transcriptCues(v).length);
+async function saveHistoryTranscripts() {
+  const vids = exportTargets().filter((v) => hasTranscript(v) || transcriptCues(v).length);
   if (!vids.length) {
-    toast("No transcripts in selection");
+    toast("No transcripts to export");
     return;
   }
-  const text = vids.map((v) => {
-    const timed = transcriptCues(v).length > 0;
-    return `# ${v.title || v.videoId}\n\n${transcriptCopyText(v, timed)}`.trim();
-  }).join("\n\n---\n\n");
-  const filename = vids.length === 1
-    ? `${sanitizeFilename(vids[0].title || vids[0].videoId)}-transcript.md`
-    : `pipeline-transcripts-${new Date().toISOString().slice(0, 10)}.md`;
-  downloadText(filename, text);
+  await downloadNotes(vids, "transcript");
   toast(`Saved ${vids.length} transcript${vids.length === 1 ? "" : "s"}`);
+}
+
+function notesRemovedWith(vids) {
+  const extra = [];
+  for (const v of vids) {
+    if (isBranchNote(v)) continue;
+    extra.push(...ui.history.filter((h) => isBranchNote(h) && branchRootId(h) === v.videoId));
+  }
+  const seen = new Set();
+  const out = [];
+  for (const n of [...vids, ...extra]) {
+    if (!n?.videoId || seen.has(n.videoId)) continue;
+    seen.add(n.videoId);
+    out.push(n);
+  }
+  return out;
+}
+
+async function deleteHistoryItems(vids) {
+  if (!vids.length) return;
+  const removed = notesRemovedWith(vids);
+  const ids = new Set(removed.map((v) => v.videoId));
+  ui.history = ui.history.filter((h) => !ids.has(h.videoId));
+  ids.forEach((id) => ui.historySelected.delete(id));
+  if (ui.openNote && ids.has(ui.openNote.videoId)) setTab("history");
+  renderHistory();
+  await Promise.all(removed.map((v) => api.unprocessVideo(v.videoId, v.processedAt)));
+  const n = removed.length;
+  toast(`Deleted ${n} note${n === 1 ? "" : "s"}`, "Undo", async () => {
+    for (const v of removed) await api.saveProcessed(v);
+    const have = new Set(ui.history.map((h) => h.videoId));
+    ui.history = [...removed.filter((v) => !have.has(v.videoId)), ...ui.history];
+    renderHistory();
+  });
 }
 
 function openHistoryVideos() {
@@ -1514,7 +1573,7 @@ function renderHistory() {
       : `<img class="thumb" alt="" src="${thumbUrl(thumbId)}" />`;
     const prefix = synth
       ? `Synthesis${nSources ? ` · ${nSources} notes` : ""}`
-      : branch ? "Branch" : (v.channelName || "");
+      : branch ? "Branch" : (videoChannelLabel(v) || "");
     const metaStr = `${prefix} · ${formatWhen(v.processedAt)}${v.analysisSource === "gemini-web" ? " · Gemini" : ""}${branches > 0 ? ` · ${branches} branch${branches > 1 ? "es" : ""}` : ""}`;
 
     el.innerHTML = `
@@ -1528,6 +1587,7 @@ function renderHistory() {
           <button class="text-btn" data-transcript ${hasTranscript(v) || isYoutubeNote(v) ? "" : "disabled"}>Open transcript</button>
           <button class="text-btn" data-open2 ${synth || branch ? "disabled" : ""}>Open video</button>
           <button class="text-btn" data-gemini>Gemini</button>
+          <button class="text-btn" data-del>Delete</button>
         </div>
       </div>`;
     el.querySelector("input").onchange = (e) => {
@@ -1543,6 +1603,10 @@ function renderHistory() {
       window.open(v.videoUrl || `https://www.youtube.com/watch?v=${v.videoId}`, "_blank");
     };
     el.querySelector("[data-gemini]").onclick = () => openInGemini(v, false);
+    el.querySelector("[data-del]").onclick = (e) => {
+      e.stopPropagation();
+      deleteHistoryItems([v]);
+    };
     list.appendChild(el);
   });
   renderHistoryBulk();
@@ -1712,15 +1776,10 @@ function wire() {
   };
   $("needs-cat-apply").onclick = applyNeedsCategory;
   $("history-select-all").onclick = toggleHistorySelectAll;
-  $("history-save-md").onclick = saveHistoryMarkdown;
-  $("history-save-tr").onclick = saveHistoryTranscripts;
-  $("history-synth").onclick = () => {
-    if (!selectedHistory().length) return;
-    $("synth-sheet").classList.remove("hidden");
-    $("synth-input").focus();
-  };
-  $("synth-send").onclick = sendSynthesis;
+  $("history-export-notes").onclick = saveHistoryMarkdown;
+  $("history-export-transcripts").onclick = saveHistoryTranscripts;
   $("history-open").onclick = openHistoryVideos;
+  $("history-delete").onclick = () => deleteHistoryItems(selectedHistory());
   $("track-btn").onclick = async () => {
     const url = $("channel-url").value.trim();
     const category = $("channel-cat").value;
@@ -1747,12 +1806,34 @@ function wire() {
   };
 }
 
+let panelClosing = false;
+
+function connectPanel() {
+  if (panelClosing) return;
+  const port = chrome.runtime.connect({ name: "sidepanel" });
+  port.onMessage.addListener((msg) => {
+    if (msg.type !== "CLOSE_PANEL") return;
+    panelClosing = true;
+    window.close();
+  });
+  port.onDisconnect.addListener(() => {
+    if (panelClosing) return;
+    if (!chrome.runtime?.id) return;
+    setTimeout(connectPanel, 150);
+  });
+}
+connectPanel();
+
 chrome.runtime.sendMessage({ type: "PANEL_STATE", open: true });
 window.addEventListener("pagehide", () => {
+  panelClosing = true;
   chrome.runtime.sendMessage({ type: "PANEL_STATE", open: false });
 });
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === "CLOSE_PANEL") window.close();
+  if (msg.type === "CLOSE_PANEL") {
+    panelClosing = true;
+    window.close();
+  }
   if (msg.type === "QUEUE_UPDATED") {
     setTab("pending");
     loadAll();

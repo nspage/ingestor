@@ -1,18 +1,33 @@
 importScripts("./app/gemini-rpc.js");
 const LOCAL = "http://127.0.0.1:3000/api/extension";
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 const CONTEXT_TTL_MS = 5 * 60 * 1000;
 let contextCache = null;
 let contextInflight = null;
 const processedCache = new Map();
 const processedInflight = new Map();
 
+let panelPort = null;
+
 async function getPanelOpen() {
+  if (panelPort) return true;
   const data = await chrome.storage.session.get("panelOpen");
   return !!data.panelOpen;
 }
 async function setPanelOpen(open) {
   await chrome.storage.session.set({ panelOpen: !!open });
 }
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== "sidepanel") return;
+  panelPort = port;
+  setPanelOpen(true);
+  port.onDisconnect.addListener(() => {
+    if (panelPort !== port) return;
+    panelPort = null;
+    setPanelOpen(false);
+  });
+});
 
 async function helperUp() {
   try {
@@ -100,9 +115,7 @@ function contextFresh() {
 
 function invalidateKvCache() {
   contextCache = null;
-  for (const [id, row] of processedCache) {
-    if (!row.exists) processedCache.delete(id);
-  }
+  processedCache.clear();
 }
 
 async function notifyYoutubeTabs(message) {
@@ -717,27 +730,32 @@ async function togglePickOnTab(tab) {
   }
 }
 
-chrome.commands.onCommand.addListener(async (command, tab) => {
+function openPipelinePanel(tab) {
+  const open = (opts) => chrome.sidePanel.open(opts).catch((err) => console.warn("sidePanel.open failed", err));
+  if (tab?.windowId != null) {
+    open({ windowId: tab.windowId });
+    return;
+  }
+  if (tab?.id != null) {
+    open({ tabId: tab.id });
+    return;
+  }
+  chrome.windows.getLastFocused({ windowTypes: ["normal"] }, (win) => {
+    if (win?.id != null) open({ windowId: win.id });
+  });
+}
+
+chrome.commands.onCommand.addListener((command, tab) => {
   if (command === "pick-videos") {
     togglePickOnTab(tab);
     return;
   }
   if (command !== "toggle-pipeline") return;
-  const isPanelOpen = await getPanelOpen();
-  if (isPanelOpen) {
-    chrome.runtime.sendMessage({ type: "CLOSE_PANEL" }, () => void chrome.runtime.lastError);
-    await setPanelOpen(false);
+  if (panelPort) {
+    panelPort.postMessage({ type: "CLOSE_PANEL" });
     return;
   }
-  const windowId = tab?.windowId;
-  const tabId = tab?.id;
-  if (windowId != null) {
-    await setPanelOpen(true);
-    chrome.sidePanel.open({ windowId });
-  } else if (tabId != null) {
-    await setPanelOpen(true);
-    chrome.sidePanel.open({ tabId });
-  }
+  openPipelinePanel(tab);
 });
 
 chrome.tabs.onRemoved.addListener((closedId) => {

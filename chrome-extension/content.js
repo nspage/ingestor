@@ -150,11 +150,11 @@ function ensurePanel() {
   panel = document.createElement("div");
   panel.id = "ytp-pipeline-panel";
   panel.innerHTML = `
-    <div class="ytp-hd">Pipeline</div>
+    <div class="ytp-hd">ingestor</div>
     <div id="ytp-badge" class="ytp-badge"></div>
     <div id="ytp-cats" class="ytp-cats"></div>
     <div class="ytp-row">
-      <button type="button" id="ytp-send">Send to pipeline</button>
+      <button type="button" id="ytp-send">Send to ingestor</button>
       <button type="button" id="ytp-cancel" class="ghost">Close</button>
     </div>
   `;
@@ -229,7 +229,7 @@ async function decorateWatch() {
   if (!id) return;
 
   if (watchLooksShort()) {
-    setWatchBadge(id, "Too short for pipeline");
+    setWatchBadge(id, "Too short for ingestor");
     return;
   }
 
@@ -295,7 +295,7 @@ function openSendPanel(ctx, knownChannel) {
   const sendBtn = panel.querySelector("#ytp-send");
   catBox.innerHTML = "";
   sendBtn.disabled = false;
-  sendBtn.textContent = "Send to pipeline";
+  sendBtn.textContent = "Send to ingestor";
   if (knownChannel) {
     badge.textContent = `Will use ${knownChannel.category}`;
     catBox.style.display = "none";
@@ -352,7 +352,7 @@ function injectWatchButton() {
   const btn = document.createElement("button");
   btn.id = "antigravity-process-btn";
   btn.className = "antigravity-btn";
-  btn.textContent = "Send to pipeline";
+  btn.textContent = "Send to ingestor";
   btn.onclick = async () => {
     try {
       const ctx = await sendRuntime({ type: "PAGE_CONTEXT" });
@@ -707,7 +707,7 @@ async function tick() {
       await decorateWatch();
     } else if (!pick.on) {
       const badge = document.getElementById("pipeline-inline-badge");
-      if (badge && badge.textContent === "Too short for pipeline") badge.remove();
+      if (badge && badge.textContent === "Too short for ingestor") badge.remove();
     }
     if (isChannelPage()) injectChannelButton();
   } catch (err) {

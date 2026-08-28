@@ -15,6 +15,8 @@ export const dailyEmailDigest = schedules.task({
   cron: {
     pattern: "0 21 * * *",
     timezone: TIMEZONE,
+    // Do not run on the leftover Trigger.dev prod deploy.
+    environments: ["DEVELOPMENT"],
   },
   run: async () => {
     console.log("Building daily email digest...");
