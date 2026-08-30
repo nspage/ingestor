@@ -1,3 +1,33 @@
+// Same rules as app/inbox-rules.js — content scripts cannot import that ES module.
+const MIN_PENDING_SECONDS = 180;
+const PLACEHOLDER_CHANNEL_NAMES = [
+  "",
+  "unknown",
+  "unknown channel",
+  "visit source",
+  "youtube video feed",
+  "youtube",
+  "untitled",
+];
+
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
+}
+
+function isPlaceholderChannelName(name) {
+  const trimmed = decodeHtmlEntities(String(name || "")).trim();
+  if (!trimmed) return true;
+  if (PLACEHOLDER_CHANNEL_NAMES.includes(trimmed.toLowerCase())) return true;
+  if (/^channel-\d+$/i.test(trimmed)) return true;
+  return false;
+}
+
 const HIGHLIGHT_SELECTOR = [
   "yt-lockup-view-model",
   "ytd-rich-item-renderer",
@@ -122,7 +152,7 @@ function watchChannel() {
   for (const sel of selectors) {
     const el = document.querySelector(sel);
     const name = (el?.innerText || el?.textContent || "").replace(/\s+/g, " ").trim();
-    if (name && !/^(unknown|visit source)$/i.test(name)) return name;
+    if (name && !isPlaceholderChannelName(name)) return name;
   }
   return "";
 }
@@ -161,7 +191,7 @@ function watchLooksShort() {
   const video = mainPlayerVideo();
   const seconds = video?.duration;
   if (!Number.isFinite(seconds) || seconds < 1) return false;
-  return seconds < 180;
+  return seconds < MIN_PENDING_SECONDS;
 }
 
 function ensurePanel() {

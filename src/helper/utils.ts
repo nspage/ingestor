@@ -1,6 +1,8 @@
 import { config } from "dotenv";
 config({ override: true });
 import { YoutubeTranscript } from 'youtube-transcript';
+import { decodeHtmlEntities, isPlaceholderChannelName } from "../../worker/src/queue";
+export { decodeHtmlEntities, isPlaceholderChannelName };
 
 // ──────────────────────────────────────────────
 // Telegram Utilities
@@ -52,24 +54,6 @@ export async function sendTelegramDocument(
 // ──────────────────────────────────────────────
 // YouTube Utilities
 // ──────────────────────────────────────────────
-
-function decodeHtmlEntities(value: string): string {
-  return String(value || "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'");
-}
-
-export function isPlaceholderChannelName(name: string | undefined | null): boolean {
-  const trimmed = decodeHtmlEntities(String(name || "")).trim();
-  if (!trimmed) return true;
-  const lower = trimmed.toLowerCase();
-  if (["unknown", "unknown channel", "visit source", "youtube video feed", "youtube", "untitled"].includes(lower)) return true;
-  return /^channel-\d+$/i.test(trimmed);
-}
 
 export type VideoIdentity = {
   videoId: string;

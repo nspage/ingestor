@@ -43,20 +43,11 @@ export const GEMINI_MODEL = "gemini-3.1-flash-lite";
 export const PUBSUB_LEASE_SECONDS = 432_000;
 
 /** Skip auto-ingest under this length unless the channel category allows Shorts. */
-export const MIN_PENDING_SECONDS = 180;
-
-export const SHORT_TEXT_CATEGORY = "short text extract";
-
-export function categoryAllowsShorts(
-  category: string | undefined,
-  categories: Array<{ name?: string; visualAssets?: { enabled?: boolean; kinds?: string[] } }> = []
-): boolean {
-  const name = String(category || "").trim().toLowerCase();
-  if (name === SHORT_TEXT_CATEGORY) return true;
-  const cat = categories.find((c) => String(c.name || "").trim().toLowerCase() === name);
-  const kinds = cat?.visualAssets?.kinds || [];
-  return !!(cat?.visualAssets?.enabled && kinds.includes("on_screen_text"));
-}
+export {
+  MIN_PENDING_SECONDS,
+  SHORT_TEXT_CATEGORY,
+  categoryAllowsShorts,
+} from "../../worker/src/queue";
 
 // ──────────────────────────────────────────────
 // Video types
