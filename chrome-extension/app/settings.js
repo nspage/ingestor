@@ -3,6 +3,7 @@ import { getState } from "./state.js";
 import { $, toast } from "./panel-dom.js";
 import { ui } from "./panel-state.js";
 import { escapeHtml } from "./markdown.js";
+import { DEFAULT_CATEGORISATION_PROMPT } from "./categories.js";
 
 const MODELS = [
   { id: "google/gemini-3.1-flash-lite", name: "3.1 Flash Lite" },
@@ -27,20 +28,6 @@ export function normalizeModelId(id) {
   if (raw.includes("/")) return raw;
   return "google/" + raw;
 }
-
-const DEFAULT_CAT_PROMPT = `You are an expert Content Strategist. Based on the following transcript snippets, classify this channel into EXACTLY one of the following six categories.
-
-CATEGORIES:
-1. Tactical: Practical how-to guides, technical tutorials, walkthroughs, coding, or step-by-step SOPs.
-2. Ideation: Brainstorming business ideas, market white space, niche hunting, or consumer trends.
-3. Strategy: High-level frameworks, mental models, macro shifts, or long-term positioning.
-4. News/Roundup: Current events, industry headlines, weekly updates, or commentary on trends.
-5. second brain: PKM, productivity systems, note-taking, or linking-your-thinking workflows.
-6. short text extract: Shorts and clips where the value is on-screen text (prompts, emails, tweets, notes the OP scrolls through).
-
-Instructions:
-- Return ONLY the category name (one of: Tactical, Ideation, Strategy, News/Roundup, second brain, short text extract).
-- If it fits multiple, pick the most dominant one.`;
 
 export function modelOptions(selected) {
   selected = normalizeModelId(selected);
@@ -75,7 +62,7 @@ export async function renderSettings() {
   await paintKeysStatus();
   const details = await api.getCategorisationPrompt().catch(() => ({ prompt: "", model: "" }));
   const prompt = details.prompt || details.data?.prompt || "";
-  $("sys-prompt").value = prompt || DEFAULT_CAT_PROMPT;
+  $("sys-prompt").value = prompt || DEFAULT_CATEGORISATION_PROMPT;
   $("sys-model").innerHTML = modelOptions(details.model || details.data?.model || "google/gemini-3.1-flash-lite");
   const box = $("settings-cats");
   box.innerHTML = "";
