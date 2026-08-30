@@ -172,6 +172,52 @@ test("DELETE /api/videos/pending refuses ids that already have a note", async ()
   assert.equal((await reborn.json()).some((v: { videoId: string }) => v.videoId === "vid-e"), true);
 });
 
+test("POST /api/videos/processed re-save patches fields instead of dropping them", async () => {
+  const kv = mockKv();
+  await app.request(
+    "/api/videos/processed",
+    auth({
+      method: "POST",
+      body: noteBody("vid-i", {
+        analysisSource: "gemini-web",
+        analysisTurns: [{ role: "model", markdown: "hi" }],
+        transcript: "spoken words",
+        descriptionStatus: "added",
+        descriptionBlock: "## From the description",
+        geminiChatUrl: "https://gemini.google.com/app/x",
+        assets: [{ t: "01:00", type: "chart", title: "T", reconstruction: "|a|" }],
+      }),
+    }),
+    env(kv)
+  );
+  // Re-save with only analysis: metadata and visual fields survive.
+  await app.request(
+    "/api/videos/processed",
+    auth({ method: "POST", body: noteBody("vid-i") }),
+    env(kv)
+  );
+  const history = await app.request("/api/videos/analyses?date=2026-02-01", auth(), env(kv));
+  const notes = await history.json();
+  const note = notes.find((n: { videoId: string }) => n.videoId === "vid-i");
+  assert.equal(note.analysisSource, "gemini-web");
+  assert.equal(note.analysis, "## Note for vid-i");
+  assert.equal(note.analysisTurns.length, 1);
+  assert.equal(note.transcript, "spoken words");
+  assert.equal(note.descriptionStatus, "added");
+  assert.equal(note.geminiChatUrl, "https://gemini.google.com/app/x");
+  assert.equal(note.assets.length, 1);
+  // Explicit null clears a field the writer no longer wants.
+  await app.request(
+    "/api/videos/processed",
+    auth({ method: "POST", body: noteBody("vid-i", { assets: null, visualStatus: null, visualNote: null }) }),
+    env(kv)
+  );
+  const after = await app.request("/api/videos/analyses?date=2026-02-01", auth(), env(kv));
+  const cleared = (await after.json()).find((n: { videoId: string }) => n.videoId === "vid-i");
+  assert.equal(cleared.assets, null);
+  assert.equal(cleared.visualStatus, null);
+});
+
 // ── Completion envelope: saving a note completes the inbox item ──
 // Shared completion (issue #5): POST /api/videos/processed removes the video
 // from pending itself — writers no longer do their own cleanup. Undoing the

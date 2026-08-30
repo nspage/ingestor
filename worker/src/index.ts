@@ -428,19 +428,32 @@ app.get("/api/videos/processed/:videoId", async (c) => {
 
 /** POST /api/videos/processed — Save a processed video and complete its inbox item.
  *  Completion is the Worker's job (issue #5): the pending row is removed here,
- *  not by the writers. */
+ *  not by the writers.
+ *
+ *  Patch semantics: a re-save patches the stored note instead of replacing it.
+ *  - Metadata (description*, geminiChatUrl, cues, sourceVideoIds, branchSource,
+ *    analysisSource): kept from the previous note when the payload omits them.
+ *  - Content (analysis, analysisTurns, transcript, assets, visualStatus,
+ *    visualNote, cost, usage): replaced only when the writer sends them; send
+ *    null / [] to clear, omit to preserve. */
+const NOTE_MERGE_FIELDS = [
+  "description", "descriptionBlock", "descriptionStatus", "geminiChatUrl",
+  "cues", "sourceVideoIds", "branchSource", "analysisSource",
+  "analysis", "analysisTurns", "transcript", "assets",
+  "visualStatus", "visualNote", "cost", "usage",
+];
+
 app.post("/api/videos/processed", async (c) => {
   if (!requireAuth(c)) return c.json({ error: "Unauthorized" }, 401);
 
   const video = await c.req.json();
-  // Patch semantics: when a re-save omits a field, keep the previous value.
   const dateKey = video.processedAt?.slice(0, 10) || new Date().toISOString().slice(0, 10);
   const prevRaw = await c.env.YT_KV.get(analysisKey(dateKey, video.videoId));
   if (prevRaw) {
     try {
       const prev = JSON.parse(prevRaw);
-      for (const field of ["description", "descriptionBlock", "descriptionStatus", "geminiChatUrl", "cues", "sourceVideoIds", "branchSource"]) {
-        if (video[field] == null && prev?.[field] != null) video[field] = prev[field];
+      for (const field of NOTE_MERGE_FIELDS) {
+        if (video[field] === undefined && prev?.[field] != null) video[field] = prev[field];
       }
     } catch { /* keep incoming */ }
   }
