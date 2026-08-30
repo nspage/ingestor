@@ -99,13 +99,8 @@ function invalidateContext() {
 }
 
 export async function getQueue() {
-  try {
-    const list = await workerFetch("/api/videos/pending");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/queue");
-    return data.queue || [];
-  }
+  const list = await workerFetch("/api/videos/pending");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getChannels() {
@@ -165,45 +160,22 @@ export async function unprocessVideo(videoId, processedAt) {
 }
 
 export async function getHistory() {
-  try {
-    const list = await workerFetch("/api/videos/analyses?date=all");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/history");
-    return data.history || [];
-  }
+  const list = await workerFetch("/api/videos/analyses?date=all");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getFailed() {
-  try {
-    const list = await workerFetch("/api/videos/failed");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/failed");
-    return data.failed || [];
-  }
+  const list = await workerFetch("/api/videos/failed");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getCost() {
-  try {
-    return await workerFetch("/api/costs/daily");
-  } catch {
-    return localFetch("/cost");
-  }
+  return workerFetch("/api/costs/daily");
 }
 
 export async function isProcessed(videoId) {
-  try {
-    const data = await workerFetch(`/api/videos/processed/${videoId}`);
-    return !!data.exists;
-  } catch {
-    try {
-      const data = await localFetch(`/processed/${videoId}`);
-      return !!data.exists;
-    } catch {
-      return false;
-    }
-  }
+  const data = await workerFetch(`/api/videos/processed/${videoId}`);
+  return !!data.exists;
 }
 
 export async function discardVideos(videoIds) {
