@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 config({ override: true });
-import { Resend } from 'resend';
 import { YoutubeTranscript } from 'youtube-transcript';
 
 // ──────────────────────────────────────────────
@@ -46,41 +45,6 @@ export async function sendTelegramDocument(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("Error sending Telegram document:", error);
-    return { ok: false, error: message };
-  }
-}
-
-// ──────────────────────────────────────────────
-// Email Utilities (Resend)
-// ──────────────────────────────────────────────
-
-/**
- * Send an HTML email via Resend.
- */
-export async function sendEmail(opts: {
-  to: string | string[];
-  subject: string;
-  html: string;
-}): Promise<{ ok: boolean; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    return { ok: false, error: "RESEND_API_KEY missing in .env" };
-  }
-
-  const resend = new Resend(apiKey);
-  const recipients = Array.isArray(opts.to) ? opts.to : [opts.to];
-
-  try {
-    await resend.emails.send({
-      from: 'YT Pipeline <onboarding@resend.dev>',
-      to: recipients,
-      subject: opts.subject,
-      html: opts.html,
-    });
-    return { ok: true };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("Resend error:", error);
     return { ok: false, error: message };
   }
 }

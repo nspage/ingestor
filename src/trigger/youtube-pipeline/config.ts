@@ -39,12 +39,6 @@ export const YOUTUBE_FEED_URL = (channelId: string) =>
 /** Default text model for analysis. Bare Gemini ids are normalized to `google/…` at call time. */
 export const GEMINI_MODEL = "gemini-3.1-flash-lite";
 
-/** IANA timezone for the daily digest cron. Default UTC. */
-export const TIMEZONE = process.env.TIMEZONE || "UTC";
-
-/** Daily digest recipient. Empty means the digest is skipped. */
-export const EMAIL_TO = process.env.EMAIL_TO || "";
-
 /** PubSubHubbub lease duration in seconds (5 days) */
 export const PUBSUB_LEASE_SECONDS = 432_000;
 
