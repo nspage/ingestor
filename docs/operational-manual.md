@@ -38,6 +38,8 @@ YouTube PubSubHubbub is the fast path: a push when a tracked channel publishes. 
 
 Auto-ingest skips clips under 3 minutes unless the channel’s category is **short text extract** (or that category has visual kind `on_screen_text`). Sending a Short from YouTube always queues it. The panel never auto-discards Shorts.
 
+On YouTube pages, the floating **pacman** button (bottom right) opens the on-page actions: **Pick videos** on any page, **Track channel** on channel pages. Track sends the channel to Pending setup with the first category; watch/Shorts pages keep the **Send to Ingestor** button under the player.
+
 ## Prompts
 
 Category prompts are stored in KV. Edit them in the extension Categories UI, or change worker seed defaults (`DEFAULT_CATEGORIES`, next to the category vocabulary `CATEGORY_VOCABULARY`) in `worker/src/queue.ts`.

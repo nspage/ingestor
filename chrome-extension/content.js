@@ -444,37 +444,6 @@ function injectWatchButton() {
   menu.insertBefore(btn, menu.firstChild);
 }
 
-function injectChannelButton() {
-  if (document.getElementById("antigravity-track-btn")) return;
-  if (!isChannelPage()) return;
-  const box = document.querySelector("#inner-header-container #buttons") || document.querySelector("#subscribe-button");
-  if (!box) return;
-  const btn = document.createElement("button");
-  btn.id = "antigravity-track-btn";
-  btn.className = "antigravity-btn";
-  btn.textContent = "Track Channel";
-  btn.onclick = async () => {
-    try {
-      const ctx = await sendRuntime({ type: "PAGE_CONTEXT" });
-      const already = (ctx.channels || []).some((c) => location.href.includes(c.id));
-      if (already) {
-        btn.textContent = "Already tracked";
-        return;
-      }
-      const category = ctx.categories?.[0] || DEFAULT_CATEGORY;
-      btn.textContent = "Tracking…";
-      const res = await sendRuntime({
-        type: "ADD_CHANNEL",
-        payload: { url: location.href, category },
-      });
-      btn.textContent = res?.success ? `Tracking · ${res.category || category}` : "Failed";
-    } catch (err) {
-      btn.textContent = isInvalidated(err) ? "Reload tab" : "Failed";
-    }
-  };
-  box.prepend(btn);
-}
-
 function textOf(el) {
   return (el?.getAttribute?.("title") || el?.textContent || "").replace(/\s+/g, " ").trim();
 }
@@ -592,13 +561,18 @@ function ensureLauncher() {
   el = document.createElement("button");
   el.id = "ytp-pick-launch";
   el.type = "button";
-  el.textContent = "Pick Videos";
-  el.title = "⌘\u00a0⇧\u00a01";
-  el.setAttribute("aria-label", "Pick Videos");
+  el.title = "Pipeline";
+  el.setAttribute("aria-label", "Pipeline");
+  el.setAttribute("aria-expanded", "false");
+  const img = document.createElement("img");
+  img.src = chrome.runtime.getURL("img/pacman.png");
+  img.alt = "";
+  img.draggable = false;
+  el.appendChild(img);
   el.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    togglePick();
+    togglePacMenu();
   });
   document.documentElement.appendChild(el);
   return el;
@@ -607,6 +581,92 @@ function ensureLauncher() {
 function syncLauncher() {
   const el = ensureLauncher();
   el.hidden = !!pick.on;
+  if (!el.hidden) el.setAttribute("aria-expanded", isPacMenuOpen() ? "true" : "false");
+}
+
+function isPacMenuOpen() {
+  return document.getElementById("ytp-pac-menu")?.classList.contains("open") || false;
+}
+
+function isPacMenuOpen() {
+  return document.getElementById("ytp-pac-menu")?.classList.contains("open") || false;
+}
+
+function pacMenu() {
+  let el = document.getElementById("ytp-pac-menu");
+  if (el) return el;
+  el = document.createElement("div");
+  el.id = "ytp-pac-menu";
+  el.setAttribute("role", "menu");
+  el.innerHTML = `
+    <button type="button" role="menuitem" id="ytp-pac-pick">Pick videos</button>
+    <button type="button" role="menuitem" id="ytp-pac-track">Track channel</button>
+  `;
+  el.querySelector("#ytp-pac-pick").addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closePacMenu();
+    togglePick();
+  });
+  el.querySelector("#ytp-pac-track").onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closePacMenu();
+    trackChannelAction();
+  };
+  document.documentElement.appendChild(el);
+  return el;
+}
+
+function closePacMenu() {
+  const el = document.getElementById("ytp-pac-menu");
+  if (el) el.classList.remove("open");
+  ensureLauncher().setAttribute("aria-expanded", "false");
+}
+
+function togglePacMenu() {
+  const menu = ensurePacMenu();
+  const open = menu.classList.toggle("open");
+  ensureLauncher().setAttribute("aria-expanded", open ? "true" : "false");
+  menu.querySelector("#ytp-pac-track").hidden = !isChannelPage();
+}
+
+function ensurePacMenu() {
+  let el = document.getElementById("ytp-pac-menu");
+  if (el) return el;
+  el = pacMenu();
+  // Outside click closes the menu (pointer events bubble before click handlers run).
+  window.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (!isPacMenuOpen()) return;
+      const path = e.composedPath ? e.composedPath() : [];
+      if (path.some((n) => n?.id === "ytp-pac-menu" || n?.id === "ytp-pick-launch")) return;
+      closePacMenu();
+    },
+    true
+  );
+  return el;
+}
+
+async function trackChannelAction() {
+  try {
+    const ctx = await sendRuntime({ type: "PAGE_CONTEXT" });
+    const already = (ctx.channels || []).some((c) => location.href.includes(c.id));
+    if (already) {
+      showBadge("Already tracked");
+      return;
+    }
+    const category = ctx.categories?.[0] || DEFAULT_CATEGORY;
+    showBadge("Tracking…");
+    const res = await sendRuntime({
+      type: "ADD_CHANNEL",
+      payload: { url: location.href, category },
+    });
+    showBadge(res?.success ? `Tracking · ${res.category || category}` : "Failed");
+  } catch (err) {
+    showBadge(isInvalidated(err) ? "Reload this YouTube tab to use Pipeline" : "Track failed");
+  }
 }
 
 async function enterPick() {
@@ -748,10 +808,17 @@ function togglePick() {
 }
 
 function onKey(e) {
-  if (e.key === "Escape" && pick.on) {
-    e.preventDefault();
-    exitPick(true);
-    return;
+  if (e.key === "Escape") {
+    if (isPacMenuOpen()) {
+      e.preventDefault();
+      closePacMenu();
+      return;
+    }
+    if (pick.on) {
+      e.preventDefault();
+      exitPick(true);
+      return;
+    }
   }
   if (!isPickHotkey(e) || isTypingTarget(e.target)) return;
   e.preventDefault();
@@ -774,7 +841,6 @@ async function tick() {
       const badge = document.getElementById("pipeline-inline-badge");
       if (badge && badge.textContent === "Too short for ingestor") badge.remove();
     }
-    if (isChannelPage()) injectChannelButton();
   } catch (err) {
     if (isInvalidated(err)) markDead();
   }
