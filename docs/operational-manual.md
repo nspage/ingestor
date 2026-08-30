@@ -42,7 +42,7 @@ On YouTube pages, the floating **pacman** button (bottom right) opens the on-pag
 
 ## Prompts
 
-Category prompts are stored in KV. Edit them in the extension Categories UI, or change worker defaults in `worker/src/index.ts`.
+Category prompts are stored in KV. Edit them in the extension Categories UI, or change worker seed defaults (`DEFAULT_CATEGORIES`, next to the category vocabulary `CATEGORY_VOCABULARY`) in `worker/src/queue.ts`.
 
 ## Visual assets (per category, optional)
 

@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   applyPatches,
+  canonicalCategory,
   canonicalChannelId,
+  CATEGORY_NAMES,
   categoryAllowsShorts,
+  DEFAULT_CATEGORIES,
   displayChannelName,
   findTrackedChannel,
   isPlaceholderChannelName,
@@ -174,4 +177,47 @@ test("parseFeedEntries reads every Atom entry", () => {
   assert.equal(entries[0].videoId, "aaa111");
   assert.equal(entries[1].videoId, "bbb222");
   assert.equal(entries[0].channelName, "Build in Public");
+});
+
+test("category vocabulary is the classifier's six names", () => {
+  assert.deepEqual([...CATEGORY_NAMES], [
+    "Tactical",
+    "Ideation",
+    "Strategy",
+    "News/Roundup",
+    "second brain",
+    "short text extract",
+  ]);
+  assert.equal(SHORT_TEXT_CATEGORY, "short text extract");
+});
+
+test("canonicalCategory normalizes LLM markdown and case to a vocabulary name", () => {
+  assert.equal(canonicalCategory("**Tactical**"), "Tactical");
+  assert.equal(canonicalCategory(" strategy "), "Strategy");
+  assert.equal(canonicalCategory("NEWS/ROUNDUP"), "News/Roundup");
+  assert.equal(canonicalCategory("Second Brain"), "second brain");
+  assert.equal(canonicalCategory("short text extract"), "short text extract");
+});
+
+test("canonicalCategory returns empty for names outside the vocabulary", () => {
+  assert.equal(canonicalCategory("growth"), "");
+  assert.equal(canonicalCategory("ai concepts"), "");
+  assert.equal(canonicalCategory("uncategorised"), "");
+  assert.equal(canonicalCategory(""), "");
+  assert.equal(canonicalCategory(undefined), "");
+  assert.equal(canonicalCategory(null), "");
+});
+
+test("seed defaults speak the vocabulary, not the stale seed names", () => {
+  assert.deepEqual(
+    DEFAULT_CATEGORIES.map((c) => c.name),
+    [...CATEGORY_NAMES]
+  );
+  const short = DEFAULT_CATEGORIES.find((c) => c.name === "short text extract");
+  assert.ok(short?.visualAssets?.enabled);
+  assert.deepEqual(short?.visualAssets?.kinds, ["on_screen_text"]);
+  for (const cat of DEFAULT_CATEGORIES) {
+    assert.ok(cat.prompt && cat.prompt.length > 20, `${cat.name} needs a prompt`);
+    assert.ok(cat.model, `${cat.name} needs a model`);
+  }
 });

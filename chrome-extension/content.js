@@ -350,7 +350,7 @@ function watchPayload(category, extras = {}) {
 
 function openSendPanel(ctx, knownChannel) {
   const panel = ensurePanel();
-  const cats = ctx.categories?.length ? ctx.categories : ["Strategy"];
+  const cats = ctx.categories?.length ? ctx.categories : CATEGORY_NAMES;
   const catBox = panel.querySelector("#ytp-cats");
   const badge = panel.querySelector("#ytp-badge");
   const sendBtn = panel.querySelector("#ytp-send");
