@@ -3,6 +3,7 @@ import {
   addChannel,
   addPending,
   analysisKey,
+  completeInboxNote,
   discardPending,
   patchPending,
   readAnalyses,
@@ -14,6 +15,7 @@ import {
   upsertAnalysisIndex,
   upsertPendingList,
   writeChannels,
+  KV_PROCESSED_PREFIX,
   KV_TRACKED_CHANNELS,
 } from "./store";
 import {
@@ -73,7 +75,6 @@ function requireAuth(c: any): boolean {
 
 // ── KV Key Helpers ──
 
-const KV_PROCESSED_PREFIX = "processed:";
 const KV_DAILY_COST_PREFIX = "cost:";
 const KV_CATEGORIES = "categories";
 const KV_CATEGORISATION_PROMPT = "categorisation_prompt";
@@ -406,12 +407,14 @@ app.post("/api/videos/pending", async (c) => {
 });
 
 /** DELETE /api/videos/pending — Remove videos by IDs */
+/** DELETE /api/videos/pending — discard unprocessed pending videos.
+ *  Ids that already have a saved note are skipped: completion is not discard (issue #5). */
 app.delete("/api/videos/pending", async (c) => {
   if (!requireAuth(c)) return c.json({ error: "Unauthorized" }, 401);
 
   const { videoIds } = await c.req.json();
   const result = await serialize(() => discardPending(c.env.YT_KV, Array.isArray(videoIds) ? videoIds : []));
-  return c.json({ ok: true, removed: result.removed });
+  return c.json({ ok: true, removed: result.removed, skipped: result.skipped });
 });
 
 /** GET /api/videos/processed/:videoId */
@@ -423,17 +426,16 @@ app.get("/api/videos/processed/:videoId", async (c) => {
   return c.json({ exists: !!existing });
 });
 
-/** POST /api/videos/processed — Save a processed video */
+/** POST /api/videos/processed — Save a processed video and complete its inbox item.
+ *  Completion is the Worker's job (issue #5): the pending row is removed here,
+ *  not by the writers. */
 app.post("/api/videos/processed", async (c) => {
   if (!requireAuth(c)) return c.json({ error: "Unauthorized" }, 401);
 
   const video = await c.req.json();
-  // Mark as processed
-  await c.env.YT_KV.put(`${KV_PROCESSED_PREFIX}${video.videoId}`, "1");
-  // Store full analysis (with date prefix for daily queries)
+  // Patch semantics: when a re-save omits a field, keep the previous value.
   const dateKey = video.processedAt?.slice(0, 10) || new Date().toISOString().slice(0, 10);
-  const key = analysisKey(dateKey, video.videoId);
-  const prevRaw = await c.env.YT_KV.get(key);
+  const prevRaw = await c.env.YT_KV.get(analysisKey(dateKey, video.videoId));
   if (prevRaw) {
     try {
       const prev = JSON.parse(prevRaw);
@@ -442,20 +444,9 @@ app.post("/api/videos/processed", async (c) => {
       }
     } catch { /* keep incoming */ }
   }
-  await serialize(async () => {
-    await c.env.YT_KV.put(
-      key,
-      JSON.stringify(video),
-      { expirationTtl: 60 * 60 * 24 * 30 }
-    );
-    await upsertAnalysisIndex(c.env.YT_KV, {
-      videoId: video.videoId,
-      date: dateKey,
-      processedAt: video.processedAt || dateKey,
-    });
-  });
+  const result = await completeInboxNote(c.env.YT_KV, video);
 
-  return c.json({ ok: true });
+  return c.json({ ok: true, removedFromPending: result.removedFromPending });
 });
 
 /** DELETE /api/videos/processed/:videoId — undo a completed note */
