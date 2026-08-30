@@ -210,25 +210,12 @@ export async function updatePendingCategory(videoId, category) {
 
 export async function updatePendingCategories(videoIds, category) {
   const patches = videoIds.map((videoId) => withCategory({ videoId }, category));
-  try {
-    await workerFetch("/api/videos/pending", { method: "PATCH", body: JSON.stringify({ videos: patches }) });
-  } catch {
-    for (const videoId of videoIds) {
-      await localFetch("/queue/update-category", {
-        method: "POST",
-        body: JSON.stringify({ videoId, category }),
-      });
-    }
-  }
+  await workerFetch("/api/videos/pending", { method: "PATCH", body: JSON.stringify({ videos: patches }) });
 }
 
 export async function patchPending(patches) {
   if (!patches?.length) return;
-  try {
-    await workerFetch("/api/videos/pending", { method: "PATCH", body: JSON.stringify({ videos: patches }) });
-  } catch {
-    /* worker offline */
-  }
+  await workerFetch("/api/videos/pending", { method: "PATCH", body: JSON.stringify({ videos: patches }) });
 }
 
 export async function processVideos(videos, sendToTelegram) {
