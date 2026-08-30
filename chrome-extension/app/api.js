@@ -2,19 +2,53 @@ import { getState, setState, keys } from "./state.js";
 
 const LOCAL = "http://127.0.0.1:3000/api/extension";
 
-export async function helperUp() {
+function timeoutSignal(ms) {
   try {
-    const res = await fetch(`${LOCAL}/health`);
-    const data = await res.json();
-    return !!(data && data.ok);
+    return AbortSignal.timeout(ms);
   } catch {
-    return false;
+    const c = new AbortController();
+    setTimeout(() => c.abort(), ms);
+    return c.signal;
   }
+}
+
+function helperFetch(path, init = {}) {
+  const opts = { ...init, signal: init.signal || timeoutSignal(2000) };
+  try { opts.targetAddressSpace = "loopback"; } catch { /* older chrome */ }
+  return fetch(`${LOCAL}${path}`, opts);
+}
+
+export async function helperHealth() {
+  try {
+    const res = await helperFetch("/health");
+    const data = await res.json();
+    if (data && data.ok) return data;
+  } catch {
+    /* helper off or Chrome blocked loopback */
+  }
+  return { ok: false, openrouter: false, gemini: false, youtube: false, llm: false };
+}
+
+export async function helperUp() {
+  const health = await helperHealth();
+  return !!health.ok;
+}
+
+export async function getSecrets() {
+  return localFetch("/secrets");
+}
+
+export async function saveSecrets(payload) {
+  return localFetch("/secrets", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function resolveIdentity(videoId) {
+  return localFetch(`/identity/${encodeURIComponent(videoId)}`);
 }
 
 export async function bootstrap() {
   try {
-    const res = await fetch(`${LOCAL}/bootstrap`);
+    const res = await helperFetch("/bootstrap", { signal: timeoutSignal(4000) });
     const data = await res.json();
     if (data.success && data.workerUrl && data.token) {
       await setState({ [keys().workerUrl]: data.workerUrl, [keys().workerToken]: data.token });
@@ -36,6 +70,7 @@ async function workerFetch(path, init = {}) {
   if (!url || !token) throw new Error("no-creds");
   const res = await fetch(`${url}${path}`, {
     ...init,
+    signal: init.signal || timeoutSignal(12000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
@@ -47,10 +82,13 @@ async function workerFetch(path, init = {}) {
 }
 
 async function localFetch(path, init = {}) {
-  const res = await fetch(`${LOCAL}${path}`, {
+  const opts = {
     ...init,
+    signal: init.signal || timeoutSignal(8000),
     headers: { "Content-Type": "application/json", ...(init.headers || {}) },
-  });
+  };
+  try { opts.targetAddressSpace = "loopback"; } catch { /* older chrome */ }
+  const res = await fetch(`${LOCAL}${path}`, opts);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `local ${res.status}`);
   return data;
@@ -239,6 +277,15 @@ export async function updatePendingCategories(videoIds, category) {
   }
 }
 
+export async function patchPending(patches) {
+  if (!patches?.length) return;
+  try {
+    await workerFetch("/api/videos/pending", { method: "PATCH", body: JSON.stringify({ videos: patches }) });
+  } catch {
+    /* worker offline */
+  }
+}
+
 export async function processVideos(videos, sendToTelegram) {
   const payload = videos.map((v) => ({ ...v, sendToTelegram }));
   return localFetch("/process", { method: "POST", body: JSON.stringify({ videos: payload }) });
@@ -278,11 +325,13 @@ export async function updateChannel(channelId, name, category) {
   invalidateContext();
 }
 
-export async function saveCategory(name, prompt, model) {
+export async function saveCategory(name, prompt, model, visualAssets) {
+  const body = { name, prompt, model };
+  if (visualAssets) body.visualAssets = visualAssets;
   try {
-    await workerFetch("/api/categories", { method: "POST", body: JSON.stringify({ name, prompt, model }) });
+    await workerFetch("/api/categories", { method: "POST", body: JSON.stringify(body) });
   } catch {
-    await localFetch("/categories", { method: "POST", body: JSON.stringify({ name, prompt, model }) });
+    await localFetch("/categories", { method: "POST", body: JSON.stringify(body) });
   }
 }
 

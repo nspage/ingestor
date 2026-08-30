@@ -199,6 +199,7 @@ export interface CategoryPrompt {
   name: string;
   prompt: string;
   model?: string;
+  visualAssets?: import("./config").CategoryVisualAssets;
 }
 
 export async function getCategories(): Promise<CategoryPrompt[]> {
@@ -206,10 +207,15 @@ export async function getCategories(): Promise<CategoryPrompt[]> {
   return res.json();
 }
 
-export async function saveCategory(name: string, prompt: string, model?: string): Promise<void> {
+export async function saveCategory(
+  name: string,
+  prompt: string,
+  model?: string,
+  visualAssets?: CategoryPrompt["visualAssets"]
+): Promise<void> {
   await workerFetch("/api/categories", {
     method: "POST",
-    body: JSON.stringify({ name, prompt, model }),
+    body: JSON.stringify({ name, prompt, model, visualAssets }),
   });
 }
 

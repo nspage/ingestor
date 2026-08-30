@@ -32,7 +32,7 @@
         <li><a href="https://github.com/nspage/ingestor#readme">Docs</a></li>
       </ul>
       <div class="nav-cta">
-        <a class="btn btn-ghost" href="#waitlist">Join waitlist</a>
+        <a class="btn btn-ghost" href="https://github.com/nspage/ingestor#readme">Docs</a>
         <a class="btn btn-ink" data-github href="https://github.com/nspage/ingestor">Get the extension</a>
       </div>
     </div>
@@ -44,10 +44,10 @@
         <div>
           <p class="eyebrow">ingestor</p>
           <h1>An inbox for the channels you already follow.</h1>
-          <p class="sub">New videos land in a queue. You process or discard. Gemini extracts a note in the shape of that video — SOP, framework, or briefing — and the file stays on your machine.</p>
+          <p class="sub">New videos land in a queue. You process or discard. Your model extracts a note in the shape of that video — SOP, framework, or briefing — and the file stays on your machine. You bring the keys.</p>
           <div class="hero-actions">
             <a class="btn btn-ink" data-github href="https://github.com/nspage/ingestor">Get the extension</a>
-            <a class="btn btn-ghost" href="#waitlist">Join the waitlist</a>
+            <a class="btn btn-ghost" href="https://github.com/nspage/ingestor#readme">Setup</a>
           </div>
           <p class="helper-line">Free on GitHub. A helper runs on your computer — not in the Chrome Web Store yet.</p>
         </div>
@@ -280,10 +280,10 @@
       <div class="wrap">
         <p class="eyebrow">Why it runs on your machine</p>
         <h2>YouTube will not give transcripts to a cloud IP. So the worker is you.</h2>
-        <p class="lede">A helper on your computer fetches the transcript and talks to Gemini with your key. The queue can live in your Cloudflare worker. Nothing about this product phones home. We collect an email only if you join the waitlist.</p>
+        <p class="lede">A helper on your computer fetches the transcript and talks to OpenRouter (or Gemini) with your key. The queue lives in your Cloudflare worker. Nothing about this product phones home. You pay your own tokens — there is no shared key.</p>
         <ul class="facts">
           <li>Queue fills in the cloud. Notes are written locally.</li>
-          <li>Your Gemini key. Your worker. Your helper.</li>
+          <li>Your OpenRouter or Gemini key. Your worker. Your helper.</li>
           <li>No product analytics.</li>
         </ul>
         <p><a href="privacy.html">Privacy</a></p>
@@ -311,24 +311,7 @@
             <p>Run <code>npm run helper:install</code>, then start the helper from the panel.</p>
           </li>
         </ol>
-        <p class="setup-aside">Gemini key and your worker URL go in <code>.env</code> — the README walks through it. If that already sounds like a no, the waitlist is the other door.</p>
-      </div>
-    </section>
-
-    <section class="wait" id="waitlist">
-      <div class="wrap">
-        <div class="wait-box">
-          <p class="eyebrow">Waitlist</p>
-          <h2>Want it when it is a packaged install?</h2>
-          <p class="sub">Same product. Less ceremony. We email when that exists — not a newsletter.</p>
-          <form id="waitlist-form">
-            <label class="hp" aria-hidden="true">Company <input type="text" name="company" tabindex="-1" autocomplete="off" /></label>
-            <input type="email" name="email" required placeholder="you@company.com" autocomplete="email" />
-            <button class="btn btn-coral" type="submit">Join the waitlist</button>
-          </form>
-          <p class="fine">Email only, for this product. See <a href="privacy.html">privacy</a>.</p>
-          <p id="waitlist-msg" hidden></p>
-        </div>
+        <p class="setup-aside">Your OpenRouter (or Gemini) key and your worker URL go in <code>.env</code> — the <a href="https://github.com/nspage/ingestor#readme">README</a> walks through it. Tokens are billed to you.</p>
       </div>
     </section>
 
@@ -346,7 +329,7 @@
         </details>
         <details>
           <summary>Is the helper watching me?</summary>
-          <p>It fetches transcripts and talks to Gemini for videos you process. It does not include product analytics. The waitlist form is the only time this site stores an email. <a href="privacy.html">Privacy</a>.</p>
+          <p>It fetches transcripts and talks to your OpenRouter or Gemini key for videos you process. It does not include product analytics. This site does not store an email. <a href="privacy.html">Privacy</a>.</p>
         </details>
         <details>
           <summary>Gemini Web or the API?</summary>
@@ -354,7 +337,7 @@
         </details>
         <details>
           <summary>What about Chrome Web Store?</summary>
-          <p>Not this launch. Get the extension from GitHub, or waitlist for a packaged install.</p>
+          <p>Not this launch. Clone the repo and load the unpacked extension. Setup is in the README.</p>
         </details>
         <details>
           <summary>Is this affiliated with YouTube or Google?</summary>
@@ -383,7 +366,7 @@
           <li><a href="https://github.com/nspage/ingestor">GitHub</a></li>
         </ul>
         <div class="foot-cta">
-          <a class="btn btn-ghost" href="#waitlist">Join the waitlist</a>
+          <a class="btn btn-ghost" href="https://github.com/nspage/ingestor#readme">Docs</a>
           <a class="btn btn-ink" data-github href="https://github.com/nspage/ingestor">Get the extension</a>
         </div>
       </div>

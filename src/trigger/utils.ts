@@ -107,6 +107,31 @@ export function isPlaceholderChannelName(name: string | undefined | null): boole
   return /^channel-\d+$/i.test(trimmed);
 }
 
+export type VideoIdentity = {
+  videoId: string;
+  title?: string;
+  channelName?: string;
+  authorUrl?: string;
+};
+
+/** Title + channel from YouTube oEmbed — no Data API key. Works for Shorts. */
+export async function resolveVideoIdentity(videoId: string): Promise<VideoIdentity | null> {
+  const id = String(videoId || "").trim();
+  if (!id) return null;
+  try {
+    const url = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const title = usableName(data.title) || (typeof data.title === "string" ? data.title.trim() : undefined);
+    const channelName = usableName(data.author_name) || undefined;
+    const authorUrl = typeof data.author_url === "string" ? data.author_url : undefined;
+    return { videoId: id, title, channelName, authorUrl };
+  } catch {
+    return null;
+  }
+}
+
 function extractChannelIdFromUrl(url: string): string | null {
   const match = url.match(/\/channel\/(UC[\w-]+)/);
   return match ? match[1] : null;

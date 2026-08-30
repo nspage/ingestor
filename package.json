@@ -1,7 +1,7 @@
 {
   "name": "ingestor",
   "version": "1.0.0",
-  "description": "Local-first YouTube inbox: queue videos, extract transcripts, turn them into Markdown notes with Gemini.",
+  "description": "Local-first YouTube inbox: queue videos, extract transcripts, turn them into Markdown notes. Self-hosted — you bring Cloudflare and an OpenRouter (or Gemini) key.",
   "author": "Nicolas S. Page",
   "license": "MIT",
   "repository": {
@@ -14,7 +14,8 @@
     "dev:web": "ts-node src/webapp/index.ts",
     "start:web": "ts-node src/webapp/index.ts",
     "helper:install": "bash scripts/install-helper.sh",
-    "helper:uninstall": "bash scripts/uninstall-helper.sh"
+    "helper:uninstall": "bash scripts/uninstall-helper.sh",
+    "helper:restart": "bash scripts/restart-helper.sh"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

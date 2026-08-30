@@ -7,11 +7,14 @@ import { config } from 'dotenv'
 // Import logic for Chrome Extension endpoints
 import { getPendingVideos, removePendingVideos, getAllChannels, removeTrackedChannel, addTrackedChannel, getCategories, saveCategory, deleteCategory, renameCategory, getAllAnalyses, getDailyCost, updatePendingVideos, updateAllChannels, getCategorisationPromptDetails, saveCategorisationPrompt, addPendingVideo, isVideoProcessed, getFailedVideos, saveFailedVideo, clearFailedVideo } from '../trigger/youtube-pipeline/kv-client'
 import { processVideos } from '../trigger/youtube-pipeline/process-video'
+import { completeText } from '../trigger/youtube-pipeline/llm-client'
 import { classifyChannel } from '../trigger/youtube-pipeline/classify-channel'
-import { resolveChannelInfo, resolveVideoDuration, getTranscriptSample, fetchTranscriptCues, fetchVideoDescription, isPlaceholderChannelName } from '../trigger/utils'
+import { resolveChannelInfo, resolveVideoDuration, getTranscriptSample, fetchTranscriptCues, fetchVideoDescription, isPlaceholderChannelName, resolveVideoIdentity } from '../trigger/utils'
 import { subscribeSingleChannel, unsubscribeSingleChannel } from '../trigger/youtube-pipeline/pubsub-manager'
+import { loadUserSecrets, saveUserSecrets, secretsStatus } from '../trigger/youtube-pipeline/secrets'
 
 config()
+loadUserSecrets()
 
 type Job = {
     status: "working" | "done" | "failed"
@@ -23,6 +26,12 @@ const jobs = new Map<string, Job>()
 const app = new Hono()
 
 // Enable CORS for Chrome Extension requests
+app.use('/api/extension/*', async (c, next) => {
+    if (c.req.header('Access-Control-Request-Private-Network') === 'true') {
+        c.header('Access-Control-Allow-Private-Network', 'true')
+    }
+    await next()
+})
 app.use('/api/extension/*', cors({
     origin: (origin) => {
         if (!origin) return 'http://localhost:3000'
@@ -38,7 +47,50 @@ app.use('/api/extension/*', cors({
 // === CHROME EXTENSION ENDPOINTS ===
 
 app.get('/api/extension/health', (c) => {
-    return c.json({ success: true, ok: true })
+    loadUserSecrets()
+    const secrets = secretsStatus()
+    return c.json({ success: true, ok: true, ...secrets })
+})
+
+app.get('/api/extension/secrets', (c) => {
+    loadUserSecrets()
+    return c.json({ success: true, ...secretsStatus() })
+})
+
+app.post('/api/extension/secrets', async (c) => {
+    try {
+        const body = await c.req.json().catch(() => ({}))
+        const patch: { OPENROUTER_API_KEY?: string; GOOGLE_API_KEY?: string } = {}
+        if (typeof body.openrouterApiKey === "string" && body.openrouterApiKey.trim()) {
+            patch.OPENROUTER_API_KEY = body.openrouterApiKey.trim()
+        }
+        if (typeof body.googleApiKey === "string" && body.googleApiKey.trim()) {
+            patch.GOOGLE_API_KEY = body.googleApiKey.trim()
+        }
+        if (!patch.OPENROUTER_API_KEY && !patch.GOOGLE_API_KEY) {
+            return c.json({ success: false, error: "Paste an OpenRouter key to save" }, 400)
+        }
+        saveUserSecrets(patch)
+        return c.json({ success: true, ...secretsStatus() })
+    } catch (e) {
+        return c.json({ success: false, error: String(e) }, 500)
+    }
+})
+
+app.get('/api/extension/identity/:videoId', async (c) => {
+    try {
+        const videoId = c.req.param("videoId")
+        const identity = await resolveVideoIdentity(videoId)
+        if (!identity) return c.json({ success: false, error: "not found" }, 404)
+        let channelId: string | undefined
+        if (identity.authorUrl) {
+            const info = await resolveChannelInfo(identity.authorUrl).catch(() => null)
+            if (info?.id) channelId = info.id
+        }
+        return c.json({ success: true, ...identity, channelId })
+    } catch (e) {
+        return c.json({ success: false, error: String(e) }, 500)
+    }
 })
 
 app.get('/api/extension/bootstrap', (c) => {
@@ -128,15 +180,6 @@ app.post('/api/extension/queue/restore', async (c) => {
     }
 })
 
-function durationToSeconds(label?: string): number | null {
-    if (!label) return null
-    const parts = String(label).replace(/[\[\]]/g, "").trim().split(/\s+/)[0].split(":").map(Number)
-    if (!parts.length || parts.some((n) => Number.isNaN(n))) return null
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-    if (parts.length === 2) return parts[0] * 60 + parts[1]
-    return parts[0]
-}
-
 app.post('/api/extension/queue', async (c) => {
     try {
         const body = await c.req.json()
@@ -165,19 +208,26 @@ app.post('/api/extension/queue', async (c) => {
             if (!duration && video.videoUrl) {
                 duration = await resolveVideoDuration(video.videoUrl) || undefined
             }
-            const seconds = durationToSeconds(duration)
-            if (seconds != null && seconds < 180) {
-                results.push({ videoId, status: "skipped", error: "Too short" })
-                continue
+
+            // Manual send always queues, including Shorts. Resolve names via oEmbed so we never persist "Unknown".
+            const identity = (isPlaceholderChannelName(video.channelName) || !video.title || isPlaceholderChannelName(video.title))
+                ? await resolveVideoIdentity(videoId).catch(() => null)
+                : null
+            let channelId = video.channelId && video.channelId !== "manual_ingest" ? video.channelId : ""
+            let channelName = !isPlaceholderChannelName(video.channelName) ? video.channelName : (identity?.channelName || "")
+            if (!channelId && identity?.authorUrl) {
+                const info = await resolveChannelInfo(identity.authorUrl).catch(() => null)
+                if (info?.id) channelId = info.id
+                if (info?.name && isPlaceholderChannelName(channelName)) channelName = info.name
             }
 
             const now = new Date().toISOString()
             const entry = {
                 ...video,
                 videoId,
-                title: video.title || videoId,
-                channelId: video.channelId || "manual_ingest",
-                channelName: video.channelName || "Unknown",
+                title: (video.title && !isPlaceholderChannelName(video.title) ? video.title : identity?.title) || videoId,
+                channelId: channelId || "manual_ingest",
+                channelName,
                 category: video.needsCategory ? (video.category || "") : (video.category || "Strategy"),
                 publishedAt: video.publishedAt || now,
                 videoUrl: video.videoUrl || `https://www.youtube.com/watch?v=${videoId}`,
@@ -304,10 +354,10 @@ app.get('/api/extension/categories', async (c) => {
 // 8. Save/Update category
 app.post('/api/extension/categories', async (c) => {
     try {
-        const { name, prompt, model } = await c.req.json()
+        const { name, prompt, model, visualAssets } = await c.req.json()
         if (!name || !prompt) return c.json({ success: false, error: 'Missing name or prompt' }, 400)
-        
-        await saveCategory(name, prompt, model)
+
+        await saveCategory(name, prompt, model, visualAssets)
         return c.json({ success: true })
     } catch (e) {
         return c.json({ success: false, error: String(e) }, 500)
@@ -467,27 +517,12 @@ Instructions:
             prompt = `${basePrompt}\n\nCONTENT SNIPPETS:\n${sample}`
         }
 
-        const apiKey = process.env.GEMINI_API_KEY
-        if (!apiKey) throw new Error("GEMINI_API_KEY missing in .env")
-
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${finalModel}:generateContent?key=${apiKey}`
-        const response = await fetch(geminiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
-            }),
+        const { text } = await completeText({
+            model: finalModel,
+            prompt,
+            maxTokens: 1024,
+            temperature: 0.1,
         })
-
-        if (!response.ok) {
-            const err = await response.text()
-            throw new Error(`Gemini API error ${response.status}: ${err}`)
-        }
-
-        const data: any = await response.json()
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
-        if (!text) throw new Error("Empty response from Gemini")
 
         const category = text.trim().replace(/[*_]/g, "")
         const validCategories = ["Tactical", "Ideation", "Strategy", "News/Roundup", "second brain"]
@@ -578,25 +613,16 @@ app.post('/api/extension/backfill', async (c) => {
             }
         }
 
-        const shorts: string[] = []
         const patches = pending.map((v) => {
             const m = meta.get(v.videoId)
-            const next = {
+            return {
                 ...v,
                 title: (!v.title || v.title === "YouTube video feed" || v.title === "Untitled") && m?.title ? m.title : v.title,
                 duration: v.duration || m?.duration,
             }
-            const d = next.duration || ""
-            const parts = d.split(":").map(Number)
-            let sec = 0
-            if (parts.length === 3) sec = parts[0] * 3600 + parts[1] * 60 + parts[2]
-            else if (parts.length === 2) sec = parts[0] * 60 + parts[1]
-            if (sec > 0 && sec < 180) shorts.push(v.videoId)
-            return next
         })
-        if (shorts.length) await removePendingVideos(shorts)
-        const keep = patches.filter((v) => !shorts.includes(v.videoId))
-        if (keep.length) await updatePendingVideos(keep)
+        if (patches.length) await updatePendingVideos(patches)
+        const keep = patches
 
         const named = await Promise.all(channels.map(async (ch) => {
             if (!isPlaceholderChannelName(ch.name)) return ch

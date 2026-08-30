@@ -31,7 +31,9 @@ chrome.runtime.onConnect.addListener((port) => {
 
 async function helperUp() {
   try {
-    const res = await fetch(`${LOCAL}/health`);
+    const opts = { signal: AbortSignal.timeout(2000) };
+    try { opts.targetAddressSpace = "loopback"; } catch { /* older chrome */ }
+    const res = await fetch(`${LOCAL}/health`, opts);
     const data = await res.json();
     return !!(data && data.ok);
   } catch {
@@ -241,7 +243,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       try {
         const on = await helperUp();
         if (!on) {
-          sendResponse({ success: false, error: "Helper is off. Open the extension and click Start helper." });
+          sendResponse({ success: false, error: "Helper is off. Open the extension and click Start Helper." });
           return;
         }
         const res = await fetch(`${LOCAL}/process`, {
@@ -262,7 +264,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       try {
         const on = await helperUp();
         if (!on) {
-          sendResponse({ success: false, error: "Helper is off. Open the extension and click Start helper." });
+          sendResponse({ success: false, error: "Helper is off. Open the extension and click Start Helper." });
           return;
         }
         await bootstrap();

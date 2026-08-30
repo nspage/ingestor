@@ -36,7 +36,7 @@ export const PUBSUB_HUB_URL = "https://pubsubhubbub.appspot.com/subscribe";
 export const YOUTUBE_FEED_URL = (channelId: string) =>
   `https://www.youtube.com/xml/feeds/videos.xml?channel_id=${channelId}`;
 
-/** Gemini model for analysis */
+/** Default text model for analysis. Bare Gemini ids are normalized to `google/…` at call time. */
 export const GEMINI_MODEL = "gemini-3.1-flash-lite";
 
 /** IANA timezone for the daily digest cron. Default UTC. */
@@ -47,6 +47,22 @@ export const EMAIL_TO = process.env.EMAIL_TO || "";
 
 /** PubSubHubbub lease duration in seconds (5 days) */
 export const PUBSUB_LEASE_SECONDS = 432_000;
+
+/** Skip auto-ingest under this length unless the channel category allows Shorts. */
+export const MIN_PENDING_SECONDS = 180;
+
+export const SHORT_TEXT_CATEGORY = "short text extract";
+
+export function categoryAllowsShorts(
+  category: string | undefined,
+  categories: Array<{ name?: string; visualAssets?: { enabled?: boolean; kinds?: string[] } }> = []
+): boolean {
+  const name = String(category || "").trim().toLowerCase();
+  if (name === SHORT_TEXT_CATEGORY) return true;
+  const cat = categories.find((c) => String(c.name || "").trim().toLowerCase() === name);
+  const kinds = cat?.visualAssets?.kinds || [];
+  return !!(cat?.visualAssets?.enabled && kinds.includes("on_screen_text"));
+}
 
 // ──────────────────────────────────────────────
 // Video types
@@ -73,6 +89,37 @@ export interface TranscriptCue {
   duration: number; // milliseconds
 }
 
+/** Per-category multimodal settings. Written by the extension settings UI, read by the locate pass. */
+export interface CategoryVisualAssets {
+  enabled: boolean;
+  /** Closed list — the locate pass only returns these */
+  kinds: string[];
+  model: string;
+  /** HIGH costs 4x tokens per frame; only worth it for OCR-heavy kinds (slides, code) */
+  mediaResolution: "default" | "high";
+  /** v1 supports "index" only — markdown reconstructions, no stills; "stills" is future work */
+  materialize: "index" | "stills";
+}
+
+/**
+ * One unique on-screen object (slide, diagram, UI, code, chart), reconstructed as markdown.
+ * Camera motion on the same object (zoom/pan/highlight) is the SAME asset; the model watches
+ * the whole sequence and rebuilds the full object. Never holds image bytes.
+ */
+export interface VisualAsset {
+  /** "MM:SS" or "H:MM:SS" — canonical/overview timestamp (first moment the object is fully readable) */
+  t: string;
+  /** Optional end of the sequence covering this object */
+  tEnd?: string;
+  type: string;
+  title: string;
+  /** Markdown reconstruction (table, bullets, code block, field list, diagram map). Required. */
+  reconstruction: string;
+  /** "full" when the model could read every region on screen, "partial" when a region was never shown legibly */
+  completeness?: "full" | "partial";
+  confidence?: number;
+}
+
 export interface ProcessedVideo extends PendingVideo {
   transcript: string;
   cues?: TranscriptCue[];
@@ -80,4 +127,9 @@ export interface ProcessedVideo extends PendingVideo {
   processedAt: string;
   descriptionBlock?: string;
   descriptionStatus?: "draft" | "added" | "dismissed";
+  assets?: VisualAsset[];
+  /** Why the visual pass did not run or returned nothing */
+  visualStatus?: "skipped" | "failed" | "empty";
+  /** Human-readable detail for skipped/failed (shown in the note) */
+  visualNote?: string;
 }

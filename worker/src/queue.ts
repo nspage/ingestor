@@ -30,6 +30,20 @@ export const PLACEHOLDER_CHANNEL_NAMES = [
   "untitled",
 ];
 
+export const SHORT_TEXT_CATEGORY = "short text extract";
+export const MIN_PENDING_SECONDS = 180;
+
+export function categoryAllowsShorts(
+  category: string | undefined,
+  categories: Array<{ name?: string; visualAssets?: { enabled?: boolean; kinds?: string[] } }> = []
+): boolean {
+  const name = String(category || "").trim().toLowerCase();
+  if (name === SHORT_TEXT_CATEGORY) return true;
+  const cat = categories.find((c) => String(c.name || "").trim().toLowerCase() === name);
+  const kinds = cat?.visualAssets?.kinds || [];
+  return !!(cat?.visualAssets?.enabled && kinds.includes("on_screen_text"));
+}
+
 export function decodeHtmlEntities(value: string): string {
   return String(value || "")
     .replace(/&amp;/g, "&")

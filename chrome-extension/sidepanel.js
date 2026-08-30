@@ -1,21 +1,33 @@
 import * as api from "./app/api.js";
 import { getState, setState, keys } from "./app/state.js";
-import { isShortVideo, formatWhen, thumbUrl } from "./app/duration.js";
-import { renderMarkdown, renderDescription, enrichDescription, renderTranscript, hasTranscript, transcriptCues, transcriptCopyText, isGeminiNote, splitAnalysisTurns, joinAnalysisTurns, gfmToTsv } from "./app/markdown.js";
+import { formatWhen, thumbUrl } from "./app/duration.js";
+import { renderMarkdown, renderDescription, enrichDescription, renderTranscript, hasTranscript, transcriptCues, transcriptCopyText, isGeminiNote, splitAnalysisTurns, joinAnalysisTurns, gfmToTsv, escapeHtml } from "./app/markdown.js";
 
 const MODELS = [
-  { id: "gemini-3.1-flash-lite", name: "3.1 Flash Lite" },
-  { id: "gemini-3-flash", name: "3 Flash" },
-  { id: "gemini-3-pro", name: "3 Pro" },
-  { id: "gemini-2.5-flash-lite", name: "2.5 Flash Lite" },
-  { id: "gemini-2.5-flash", name: "2.5 Flash" },
-  { id: "gemini-2.5-pro", name: "2.5 Pro" },
-  { id: "gemini-2.0-flash", name: "2.0 Flash" },
-  { id: "gemini-1.5-flash", name: "1.5 Flash" },
-  { id: "gemini-1.5-pro", name: "1.5 Pro" },
+  { id: "google/gemini-3.1-flash-lite", name: "3.1 Flash Lite" },
+  { id: "google/gemini-3-flash-preview", name: "3 Flash" },
+  { id: "google/gemini-3.1-pro-preview", name: "3.1 Pro" },
+  { id: "google/gemini-3.6-flash", name: "3.6 Flash" },
+  { id: "google/gemini-3.7-flash", name: "3.7 Flash" },
+  { id: "google/gemini-2.5-flash-lite", name: "2.5 Flash Lite" },
+  { id: "google/gemini-2.5-flash", name: "2.5 Flash" },
+  { id: "google/gemini-2.5-pro", name: "2.5 Pro" },
 ];
 
-const DEFAULT_CAT_PROMPT = `You are an expert Content Strategist. Based on the following transcript snippets, classify this channel into EXACTLY one of the following five categories.
+const VISUAL_KINDS = ["slide", "diagram", "ui", "code", "chart", "product", "on_screen_text"];
+const VISUAL_MODELS = ["google/gemini-3.7-flash", "google/gemini-3.6-flash"];
+
+/** KV may still hold bare Gemini ids from before OpenRouter. */
+function normalizeModelId(id) {
+  const raw = String(id || "").trim();
+  if (!raw) return "google/gemini-3.1-flash-lite";
+  if (raw === "gemini-3-flash" || raw === "google/gemini-3-flash") return "google/gemini-3-flash-preview";
+  if (raw === "gemini-3-pro" || raw === "google/gemini-3-pro") return "google/gemini-3.1-pro-preview";
+  if (raw.includes("/")) return raw;
+  return "google/" + raw;
+}
+
+const DEFAULT_CAT_PROMPT = `You are an expert Content Strategist. Based on the following transcript snippets, classify this channel into EXACTLY one of the following six categories.
 
 CATEGORIES:
 1. Tactical: Practical how-to guides, technical tutorials, walkthroughs, coding, or step-by-step SOPs.
@@ -23,9 +35,10 @@ CATEGORIES:
 3. Strategy: High-level frameworks, mental models, macro shifts, or long-term positioning.
 4. News/Roundup: Current events, industry headlines, weekly updates, or commentary on trends.
 5. second brain: PKM, productivity systems, note-taking, or linking-your-thinking workflows.
+6. short text extract: Shorts and clips where the value is on-screen text (prompts, emails, tweets, notes the OP scrolls through).
 
 Instructions:
-- Return ONLY the category name (one of: Tactical, Ideation, Strategy, News/Roundup, second brain).
+- Return ONLY the category name (one of: Tactical, Ideation, Strategy, News/Roundup, second brain, short text extract).
 - If it fits multiple, pick the most dominant one.`;
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -37,6 +50,7 @@ const ui = {
   history: [],
   failed: [],
   helperOn: false,
+  llmReady: false,
   selected: new Set(),
   historySelected: new Set(),
   filter: { type: "all", value: "" },
@@ -61,31 +75,120 @@ const ui = {
 
 function $(id) { return document.getElementById(id); }
 
+function reduceMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function scrollBehavior() {
+  return reduceMotion() ? "auto" : "smooth";
+}
+
 function toast(message, actionLabel, onAction) {
   const el = $("toast");
-  el.classList.remove("hidden");
-  el.innerHTML = `<span>${message}</span>`;
+  el.replaceChildren();
+  const span = document.createElement("span");
+  span.textContent = message;
+  el.appendChild(span);
   if (actionLabel && onAction) {
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className = "text-btn";
     btn.textContent = actionLabel;
     btn.onclick = () => { onAction(); el.classList.add("hidden"); };
     el.appendChild(btn);
   }
+  el.classList.remove("hidden");
   setTimeout(() => el.classList.add("hidden"), 10000);
 }
 
-function setTab(name) {
-  if (name !== "note") stashComposer();
-  ui.openNote = name === "note" ? ui.openNote : null;
-  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
-  document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
-  const view = name === "settings" ? $("view-settings") : $(`view-${name}`);
-  if (view) view.classList.add("active");
-  if (name !== "settings" && name !== "note") setState({ [keys().lastTab]: name });
+function parseHash() {
+  const raw = (location.hash || "").replace(/^#/, "");
+  const qIndex = raw.indexOf("?");
+  const path = qIndex >= 0 ? raw.slice(0, qIndex) : raw;
+  const qs = new URLSearchParams(qIndex >= 0 ? raw.slice(qIndex + 1) : "");
+  const parts = path.split("/").filter(Boolean);
+  return { parts, qs };
 }
 
-function openDoc(video, mode) {
+function writeHash(name) {
+  let path = name;
+  const q = new URLSearchParams();
+  if (name === "pending") {
+    if (ui.filter.type && ui.filter.type !== "all") {
+      q.set("type", ui.filter.type);
+      q.set("value", ui.filter.value || "");
+    }
+  } else if (name === "history") {
+    const search = $("history-search")?.value || "";
+    if (search) q.set("q", search);
+    if (ui.historyFilter.category) q.set("category", ui.historyFilter.category);
+    if (ui.historyFilter.source) q.set("source", ui.historyFilter.source);
+    if (ui.historyFilter.desc) q.set("desc", ui.historyFilter.desc);
+  } else if (name === "note" && ui.openNote?.videoId) {
+    path = `note/${encodeURIComponent(ui.openNote.videoId)}`;
+    if (ui.docMode === "transcript") path += "/transcript";
+  }
+  const qs = q.toString();
+  const hash = `#${qs ? `${path}?${qs}` : path}`;
+  if (location.hash !== hash) history.replaceState(null, "", hash);
+}
+
+function setTab(name, opts = {}) {
+  if (name !== "note") stashComposer();
+  ui.openNote = name === "note" ? ui.openNote : null;
+  document.querySelectorAll(".tab").forEach((t) => {
+    const on = t.dataset.tab === name;
+    t.classList.toggle("active", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
+    t.tabIndex = on ? 0 : -1;
+  });
+  document.querySelectorAll(".view").forEach((v) => {
+    const on = v.id === `view-${name}`;
+    v.classList.toggle("active", on);
+    v.toggleAttribute("hidden", !on);
+  });
+  if (name !== "settings" && name !== "note") setState({ [keys().lastTab]: name });
+  if (!opts.fromHash) writeHash(name);
+}
+
+function applyHash() {
+  const { parts, qs } = parseHash();
+  const root = parts[0] || "";
+  if (!root) return false;
+  if (root === "note") {
+    const id = decodeURIComponent(parts[1] || "");
+    const mode = parts[2] === "transcript" ? "transcript" : "note";
+    const video = ui.history.find((h) => h.videoId === id);
+    if (video) openDoc(video, mode, { fromHash: true });
+    else setTab("history", { fromHash: true });
+    return true;
+  }
+  if (root === "pending") {
+    ui.filter = { type: qs.get("type") || "all", value: qs.get("value") || "" };
+    setTab("pending", { fromHash: true });
+    renderPending();
+    return true;
+  }
+  if (root === "history") {
+    ui.historyFilter = {
+      category: qs.get("category") || "",
+      source: qs.get("source") || "",
+      desc: qs.get("desc") || "",
+    };
+    if ($("history-search")) $("history-search").value = qs.get("q") || "";
+    setTab("history", { fromHash: true });
+    renderHistory();
+    return true;
+  }
+  if (root === "channels" || root === "settings") {
+    setTab(root, { fromHash: true });
+    if (root === "settings") renderSettings();
+    return true;
+  }
+  return false;
+}
+
+function openDoc(video, mode, opts = {}) {
   if (ui.branchMode) exitBranchMode();
   stashComposer();
   ui.openNote = video;
@@ -96,7 +199,7 @@ function openDoc(video, mode) {
   ui.noteJustOpened = true;
   paintDoc();
   loadComposer(video.videoId);
-  setTab("note");
+  setTab("note", opts);
   if (isYoutubeNote(video) && !transcriptCues(video).length) maybeLoadCues(video, false);
 }
 
@@ -118,11 +221,13 @@ function paintDoc() {
   ].filter(Boolean).join(" · ");
   $("doc-note").classList.toggle("on", isNote);
   $("doc-transcript").classList.toggle("on", !isNote);
+  $("doc-note").setAttribute("aria-selected", isNote ? "true" : "false");
+  $("doc-transcript").setAttribute("aria-selected", isNote ? "false" : "true");
   $("doc-transcript").disabled = !hasTranscript(video) && !isYoutubeNote(video);
   $("ts-toggle").classList.toggle("hidden", isNote);
   $("show-ts").disabled = !!video._cuesLoading;
   $("show-ts").checked = ui.showTimestamps;
-  $("note-copy").textContent = isNote ? "Copy markdown" : "Copy transcript";
+  $("note-copy").textContent = isNote ? "Copy Markdown" : "Copy Transcript";
   $("note-body").classList.toggle("transcript", !isNote);
   const addedDesc = isNote && video.descriptionStatus === "added" && !!rawDescription(video);
   $("turn-nav").classList.toggle("hidden", !(gemini || addedDesc));
@@ -130,23 +235,23 @@ function paintDoc() {
   $("note-composer").classList.toggle("hidden", !gemini);
   $("note-composer").classList.toggle("tall", !!ui.composerTall);
   $("composer-branch-toggle").classList.toggle("hidden", !video.geminiChatUrl || isSynthNote(video) || isBranchNote(video));
-  $("composer-tall").textContent = ui.composerTall ? "Compact" : "Half height";
+  $("composer-tall").textContent = ui.composerTall ? "Compact" : "Half Height";
   $("note-body").classList.toggle("hidden", gemini);
   if (gemini || addedDesc) paintTurnNav(video, gemini);
   if (gemini) {
     paintGeminiThread(video);
   } else if (isNote) {
-    $("note-body").innerHTML = renderMarkdown(video.analysis || "", video);
+    $("note-body").innerHTML = renderMarkdown(video.analysis || "", video) + assetStripHtml(video);
   } else if (video._cuesLoading) {
     $("note-body").innerHTML = "<p class='md-empty'>Loading timestamps…</p>";
   } else {
     $("note-body").innerHTML = renderTranscript(video, showTs);
   }
-  $("note-video").classList.toggle("hidden", isSynthNote(video) || isBranchNote(video));
-  $("note-video").onclick = () => {
-    if (isSynthNote(video) || isBranchNote(video)) return;
-    window.open(video.videoUrl || `https://www.youtube.com/watch?v=${video.videoId}`, "_blank");
-  };
+  const videoLink = $("note-video");
+  const hideVideo = isSynthNote(video) || isBranchNote(video);
+  videoLink.classList.toggle("hidden", hideVideo);
+  if (hideVideo) videoLink.removeAttribute("href");
+  else videoLink.href = video.videoUrl || `https://www.youtube.com/watch?v=${video.videoId}`;
   $("note-copy").onclick = async () => {
     const text = isNote ? noteCopyText(video) : transcriptCopyText(video, hasCues);
     await navigator.clipboard.writeText(text);
@@ -190,6 +295,7 @@ function loadComposer(videoId) {
 }
 
 let copyDrag = null;
+let copyAnchor = null;
 
 function copyUnitText(el) {
   const encoded = el.getAttribute("data-copy");
@@ -298,6 +404,7 @@ function paintBranchList() {
     rm.type = "button";
     rm.className = "text-btn";
     rm.textContent = "×";
+    rm.setAttribute("aria-label", "Remove Branch");
     rm.onclick = () => {
       ui.branchPrompts.splice(i, 1);
       if (!ui.branchPrompts.length) ui.branchPrompts = [""];
@@ -396,6 +503,13 @@ function copyUnitFromEvent(e) {
   const unit = e.target.closest(".copy-unit");
   if (!unit) return;
   e.preventDefault();
+  if (e.shiftKey && copyAnchor) {
+    const selected = paintCopyRange(copyAnchor, unit);
+    copyText(joinCopyUnits(selected), selected.length);
+    setTimeout(clearCopyRange, 350);
+    return;
+  }
+  copyAnchor = unit;
   const text = copyUnitText(unit);
   if (e.altKey && composerVisible() && insertAtComposer(text)) {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -455,7 +569,7 @@ function paintTurnNav(video, withTurns) {
     jump.onclick = () => {
       ui.descOpen = ui.descOpen === false;
       paintDoc();
-      if (ui.descOpen !== false) $("desc-added")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (ui.descOpen !== false) $("desc-added")?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
     };
     nav.appendChild(jump);
   }
@@ -472,7 +586,7 @@ function paintTurnNav(video, withTurns) {
         ui.prefillOpen = true;
         paintDoc();
       }
-      document.getElementById(`turn-${i}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById(`turn-${i}`)?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
     };
     nav.appendChild(jump);
   });
@@ -615,7 +729,7 @@ function paintDescDraft(video, isNote) {
   $("desc-preview-body").classList.toggle("hidden", ui.descEdit);
   $("desc-edit").classList.toggle("on", ui.descEdit);
   $("desc-preview").classList.toggle("on", !ui.descEdit);
-  $("desc-add").textContent = isAdded ? "Save" : "Add to note";
+  $("desc-add").textContent = isAdded ? "Save" : "Add to Note";
   $("desc-dismiss").textContent = isAdded ? "Cancel" : "Dismiss";
 }
 
@@ -821,7 +935,13 @@ function videoChannelLabel(video) {
   const fromList = decodeHtmlName(channelName(video?.channelId)).trim();
   if (!isPlaceholderChannelName(stored)) return stored;
   if (!isPlaceholderChannelName(fromList)) return fromList;
-  return fromList || stored || "";
+  return "";
+}
+
+function isTrackedVideo(video) {
+  const id = String(video?.channelId || "").trim();
+  if (!id || id === "manual_ingest") return false;
+  return ui.channels.some((c) => c.id === id);
 }
 
 function channelCardName(ch) {
@@ -839,17 +959,23 @@ function lastActivity(channelId) {
 }
 
 async function refreshStatus() {
-  ui.helperOn = await api.helperUp();
-  if (ui.helperOn) await api.bootstrap();
-  const cost = await api.getCost().catch(() => ({ cost: 0 }));
+  const health = await api.helperHealth();
+  ui.helperOn = !!health.ok;
+  ui.llmReady = !!(health.llm || health.openrouter || health.gemini);
   const pill = $("helper-pill");
   $("helper-label").textContent = ui.helperOn ? "Helper on" : "Helper off";
-  $("status-meta").textContent = `$${(cost.cost || 0).toFixed(5)} today`;
   pill.classList.toggle("on", ui.helperOn);
   pill.classList.toggle("off", !ui.helperOn);
-  pill.disabled = ui.helperOn;
-  pill.title = ui.helperOn ? "Helper is running" : "Start helper";
+  pill.disabled = false;
+  pill.title = ui.helperOn ? "Helper is running" : "Start Helper";
+  pill.setAttribute("aria-label", pill.title);
   $("start-btn").classList.toggle("hidden", ui.helperOn);
+  if (ui.helperOn) await api.bootstrap().catch(() => {});
+  const cost = await api.getCost().catch(() => ({ cost: 0 }));
+  const costText = `$${(cost.cost || 0).toFixed(5)} today`;
+  $("status-meta").textContent = ui.helperOn && !ui.llmReady
+    ? `${costText} · add OpenRouter key in Settings`
+    : costText;
 }
 
 async function startHelperFromUi() {
@@ -879,9 +1005,12 @@ function renderFilters() {
 
   const add = (box, label, type, value, kind) => {
     const b = document.createElement("button");
-    b.className = `chip ${kind}` + (ui.filter.type === type && ui.filter.value === value ? " on" : "");
+    b.type = "button";
+    const on = ui.filter.type === type && ui.filter.value === value;
+    b.className = `chip ${kind}` + (on ? " on" : "");
     b.textContent = label;
-    b.onclick = () => { ui.filter = { type, value }; renderPending(); };
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    b.onclick = () => { ui.filter = { type, value }; renderPending(); writeHash("pending"); };
     box.appendChild(b);
   };
 
@@ -890,6 +1019,7 @@ function renderFilters() {
   chans.forEach((c) => add(chanBox, c, "channel", c, "chan"));
 
   toggle.classList.toggle("open", ui.showChannelFilters);
+  toggle.setAttribute("aria-expanded", ui.showChannelFilters ? "true" : "false");
   chanBox.classList.toggle("hidden", !ui.showChannelFilters);
   if (ui.filter.type === "channel") {
     ui.showChannelFilters = true;
@@ -918,10 +1048,10 @@ function categorySelectHtml(video) {
   const names = categoryNames(current);
   const placeholder = !hasRealCategory(video);
   const opts = [
-    placeholder ? `<option value="">Choose category</option>` : "",
+    placeholder ? `<option value="">Choose Category</option>` : "",
     ...names.map((n) => `<option value="${n}" ${!placeholder && n === current ? "selected" : ""}>${n}</option>`),
   ].join("");
-  return `<select class="card-cat" data-cat>${opts}</select>`;
+  return `<select class="card-cat" data-cat aria-label="Category">${opts}</select>`;
 }
 
 function needsCategoryVideos() {
@@ -949,10 +1079,10 @@ function renderNeedsCategory() {
     list.innerHTML = "";
     return;
   }
-  $("needs-cat-label").textContent = `Needs a category · ${needs.length} video${needs.length === 1 ? "" : "s"}`;
+  $("needs-cat-label").textContent = `Needs a Category · ${needs.length} video${needs.length === 1 ? "" : "s"}`;
   const sel = $("needs-cat-select");
   const names = ui.categories.map((c) => c.name).filter(Boolean);
-  sel.innerHTML = `<option value="">Choose category</option>` + names.map((n) => `<option value="${n}">${n}</option>`).join("");
+  sel.innerHTML = `<option value="">Choose Category</option>` + names.map((n) => `<option value="${n}">${n}</option>`).join("");
   list.innerHTML = "";
   needs.forEach((video) => list.appendChild(pendingCard(video)));
 }
@@ -963,7 +1093,7 @@ function renderPending() {
   const needs = needsCategoryVideos();
   $("pending-count").textContent = String(ui.queue.length);
   $("show-older").classList.toggle("hidden", older.length === 0 || ui.showOlder);
-  $("show-older").textContent = `Show ${older.length} older`;
+  $("show-older").textContent = `Show ${older.length} Older`;
 
   const state = ui._lastOpened || 0;
   const newer = ui.queue.filter((v) => videoTime(v) > state).length;
@@ -976,7 +1106,10 @@ function renderPending() {
   const list = $("pending-list");
   list.innerHTML = "";
   if (!shown.length && !needs.length) {
-    list.innerHTML = `<div class="empty">${ui.queue.length ? "Nothing matches this filter." : "Queue is empty."}</div>`;
+    const empty = !ui.queue.length && ui.helperOn && !ui.llmReady
+      ? "Add your OpenRouter key in Settings to process videos."
+      : (ui.queue.length ? "Nothing matches this filter." : "Queue is empty.");
+    list.innerHTML = `<div class="empty">${empty}</div>`;
     renderBulk();
     return;
   }
@@ -987,20 +1120,22 @@ function renderPending() {
 function pendingCard(video) {
   const el = document.createElement("article");
   const job = ui.jobs.get(video.videoId);
-  const canProcess = ui.helperOn && hasRealCategory(video) && !needsCategory(video);
+  const canProcess = ui.helperOn && ui.llmReady && hasRealCategory(video) && !needsCategory(video);
+  const title = video.title || video.videoId;
+  const url = video.videoUrl || `https://www.youtube.com/watch?v=${video.videoId}`;
   el.className = "card" + (job ? ` ${job}` : "");
   el.innerHTML = `
-    <input type="checkbox" data-id="${video.videoId}" ${ui.selected.has(video.videoId) ? "checked" : ""} />
-    <img class="thumb" alt="" src="${thumbUrl(video.videoId)}" />
+    <input type="checkbox" data-id="${escapeHtml(video.videoId)}" aria-label="Select ${escapeHtml(title)}" ${ui.selected.has(video.videoId) ? "checked" : ""} />
+    <img class="thumb" alt="${escapeHtml(title)}" width="88" height="50" loading="lazy" src="${thumbUrl(video.videoId)}" />
     <div>
-      <div class="title" data-open="${video.videoUrl}">${video.title || video.videoId}</div>
-      <div class="meta">${videoChannelLabel(video) || "Unknown"} · ${video.duration || "?"} · ${formatWhen(video.publishedAt || video.addedAt)}</div>
-      <div class="meta">${categorySelectHtml(video)} <button class="change" data-copy-desc="${video.videoId}">Copy description</button></div>
+      <a class="title" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(title)}</a>
+      <div class="meta">${escapeHtml(videoChannelLabel(video) || "Channel unknown")} · ${escapeHtml(video.duration || "?")} · ${escapeHtml(formatWhen(video.publishedAt || video.addedAt))}</div>
+      <div class="meta">${categorySelectHtml(video)} ${categoryHasVisual(video) ? `<span class="chip visual-chip">visual</span>` : ""} <button type="button" class="change" data-copy-desc="${escapeHtml(video.videoId)}">Copy Description</button></div>
       <div class="row-actions">
-        <button class="btn process" data-gemini="${video.videoId}">Gemini</button>
-        <button class="change" data-process="${video.videoId}" ${canProcess ? "" : "disabled"}>API Process</button>
-        <button class="btn discard" data-discard="${video.videoId}">Discard</button>
-        ${job ? `<span class="meta">${job}</span>` : ""}
+        <button type="button" class="btn process" data-gemini="${escapeHtml(video.videoId)}">Gemini</button>
+        <button type="button" class="change" data-process="${escapeHtml(video.videoId)}" ${canProcess ? "" : "disabled"}>API Process</button>
+        <button type="button" class="btn discard" data-discard="${escapeHtml(video.videoId)}">Discard</button>
+        ${job ? `<span class="meta">${escapeHtml(job)}</span>` : ""}
       </div>
     </div>
   `;
@@ -1009,7 +1144,6 @@ function pendingCard(video) {
     else ui.selected.delete(video.videoId);
     renderBulk();
   };
-  el.querySelector("[data-open]").onclick = () => window.open(video.videoUrl, "_blank");
   el.querySelector("[data-process]").onclick = () => processOne(video);
   el.querySelector("[data-discard]").onclick = () => discardOne(video);
   el.querySelector("[data-cat]").onchange = (e) => onCategoryChange(video, e.target.value);
@@ -1020,6 +1154,42 @@ function pendingCard(video) {
 
 function videoWatchUrl(video) {
   return video.videoUrl || `https://www.youtube.com/watch?v=${video.videoId}`;
+}
+
+function categoryHasVisual(video) {
+  const name = String(video.category || "").trim();
+  if (!name) return false;
+  const cat = ui.categories.find((c) => c.name === name)
+    || ui.categories.find((c) => c.name && c.name.toLowerCase() === name.toLowerCase());
+  return !!(cat?.visualAssets?.enabled && cat.visualAssets.kinds?.length);
+}
+
+function tsToSeconds(t) {
+  const parts = String(t || "").split(":").map((p) => parseInt(p, 10));
+  if (parts.some((p) => Number.isNaN(p)) || parts.length < 2) return -1;
+  return parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1];
+}
+
+function assetStripHtml(video) {
+  // Compact index only — the reconstruction lives in the note markdown (## On screen appendix)
+  const assets = Array.isArray(video.assets) ? video.assets : [];
+  if (!assets.length && !video.visualStatus) return "";
+  const base = videoWatchUrl(video);
+  const items = assets.slice(0, 8).map((a) => {
+    const secs = tsToSeconds(a.t);
+    const link = secs >= 0 ? `${base}&t=${secs}s` : base;
+    const partial = a.completeness === "partial" ? " ·partial" : "";
+    return `<a class="asset-item" href="${link}" target="_blank" rel="noreferrer">
+      <span class="asset-type">${escapeHtml(a.type)}</span>
+      <span class="asset-ts">${escapeHtml(a.t)}${partial}</span>
+      <span class="asset-title">${escapeHtml(a.title)}</span>
+    </a>`;
+  }).join("");
+  const statusNote = !assets.length && video.visualStatus
+    ? `<div class="asset-empty">${video.visualStatus === "skipped" ? "Visual pass skipped" : video.visualStatus === "failed" ? "Visual pass failed" : "No reconstructable on-screen objects"}${video.visualNote ? ` — ${escapeHtml(video.visualNote)}` : ""}</div>`
+    : "";
+  if (!items && !statusNote) return "";
+  return `<div class="asset-strip">${statusNote}${items}</div>`;
 }
 
 function geminiPrefillText(video) {
@@ -1176,7 +1346,7 @@ function renderBulk() {
   $("bulk-label").textContent = `${n} selected`;
   $("bulk-gemini").classList.toggle("hidden", n !== 1);
   const btn = $("select-all");
-  if (btn) btn.textContent = allOn ? "Deselect all" : "Select all";
+  if (btn) btn.textContent = allOn ? "Deselect All" : "Select All";
 }
 
 function toggleSelectAll() {
@@ -1202,6 +1372,12 @@ async function discardOne(video) {
 async function processOne(video) {
   if (!ui.helperOn) {
     toast("Start the helper to process.");
+    return;
+  }
+  if (!ui.llmReady) {
+    toast("Add your OpenRouter key in Settings.");
+    setTab("settings");
+    await renderSettings();
     return;
   }
   if (needsCategory(video) || !hasRealCategory(video)) {
@@ -1293,16 +1469,23 @@ function renderChannels() {
     el.style.gridTemplateColumns = "1fr";
     el.innerHTML = `
       <div>
-        <div class="title">${channelCardName(ch)}</div>
-        <div class="meta">${ch.category} · ${ch.id}${last ? ` · last ${last}` : ""}</div>
+        <div class="title">${escapeHtml(channelCardName(ch))}</div>
+        <div class="meta">${escapeHtml(ch.category)} · ${escapeHtml(ch.id)}${last ? ` · last ${escapeHtml(last)}` : ""}</div>
         <div class="row-actions">
-          <button class="btn discard" data-del="${ch.id}">Remove</button>
+          <button type="button" class="btn discard" data-del="${escapeHtml(ch.id)}">Remove</button>
         </div>
       </div>`;
     el.querySelector("[data-del]").onclick = async () => {
+      const snapshot = { ...ch };
       await api.removeChannel(ch.id);
       ui.channels = ui.channels.filter((c) => c.id !== ch.id);
       renderChannels();
+      toast("Removed channel", "Undo", async () => {
+        await api.updateChannel(snapshot.id, snapshot.name, snapshot.category);
+        const next = await api.getChannels().catch(() => null);
+        ui.channels = next || [...ui.channels, snapshot];
+        renderChannels();
+      });
     };
     list.appendChild(el);
   });
@@ -1329,11 +1512,15 @@ function renderHistoryFilters() {
   $("history-cat-block").classList.toggle("hidden", cats.length === 0);
   const add = (box, label, key, value) => {
     const b = document.createElement("button");
-    b.className = "chip cat" + (ui.historyFilter[key] === value ? " on" : "");
+    b.type = "button";
+    const on = ui.historyFilter[key] === value;
+    b.className = "chip cat" + (on ? " on" : "");
     b.textContent = label;
+    b.setAttribute("aria-pressed", on ? "true" : "false");
     b.onclick = () => {
       ui.historyFilter[key] = value;
       renderHistory();
+      writeHash("history");
     };
     box.appendChild(b);
   };
@@ -1349,7 +1536,7 @@ function renderHistoryFilters() {
   const descBox = $("history-desc-filters");
   descBox.innerHTML = "";
   add(descBox, "All", "desc", "");
-  add(descBox, "Has description", "desc", "added");
+  add(descBox, "Has Description", "desc", "added");
 }
 
 function renderHistoryBulk() {
@@ -1358,7 +1545,7 @@ function renderHistoryBulk() {
   $("history-bulk-label").textContent = `${n} selected`;
   const rows = historyRows();
   const allOn = rows.length > 0 && rows.every((v) => ui.historySelected.has(v.videoId));
-  $("history-select-all").textContent = allOn ? "Deselect all" : "Select all";
+  $("history-select-all").textContent = allOn ? "Deselect All" : "Select All";
   renderHistoryExport();
 }
 
@@ -1530,10 +1717,10 @@ function renderHistory() {
     el.style.gridTemplateColumns = "1fr";
     el.innerHTML = `
       <div>
-        <div class="title">${item.title || item.videoId}</div>
-        <div class="meta">Failed · ${item.error || "Unknown error"}</div>
+        <div class="title">${escapeHtml(item.title || item.videoId)}</div>
+        <div class="meta">Failed · ${escapeHtml(item.error || "Unknown error")}</div>
         <div class="row-actions">
-          <button class="btn process" data-retry="${item.videoId}" ${ui.helperOn ? "" : "disabled"}>Retry</button>
+          <button type="button" class="btn process" data-retry="${escapeHtml(item.videoId)}" ${ui.helperOn ? "" : "disabled"}>Retry</button>
         </div>
       </div>`;
     el.querySelector("[data-retry]").onclick = async () => {
@@ -1568,26 +1755,32 @@ function renderHistory() {
     const nSources = Array.isArray(v.sourceVideoIds) ? v.sourceVideoIds.length : 0;
     const branches = branchCounts[v.videoId] || 0;
     const thumbId = branch ? (branchParentId(v) || v.videoId) : v.videoId;
+    const title = v.title || v.videoId;
+    const watch = v.videoUrl || `https://www.youtube.com/watch?v=${v.videoId}`;
     const thumbHtml = synth
       ? `<div class="thumb synth-thumb" aria-hidden="true"></div>`
-      : `<img class="thumb" alt="" src="${thumbUrl(thumbId)}" />`;
+      : `<img class="thumb" alt="${escapeHtml(title)}" width="88" height="50" loading="lazy" src="${thumbUrl(thumbId)}" />`;
     const prefix = synth
       ? `Synthesis${nSources ? ` · ${nSources} notes` : ""}`
-      : branch ? "Branch" : (videoChannelLabel(v) || "");
+      : branch ? "Branch" : (videoChannelLabel(v) || "Channel unknown");
     const metaStr = `${prefix} · ${formatWhen(v.processedAt)}${v.analysisSource === "gemini-web" ? " · Gemini" : ""}${branches > 0 ? ` · ${branches} branch${branches > 1 ? "es" : ""}` : ""}`;
+    const showTrack = !synth && !branch && !isTrackedVideo(v);
+    const openVideo = synth || branch
+      ? ""
+      : `<a class="text-btn" href="${escapeHtml(watch)}" target="_blank" rel="noreferrer">Open Video</a>`;
 
     el.innerHTML = `
-      <input type="checkbox" data-hid="${v.videoId}" ${ui.historySelected.has(v.videoId) ? "checked" : ""} />
+      <input type="checkbox" data-hid="${escapeHtml(v.videoId)}" aria-label="Select ${escapeHtml(title)}" ${ui.historySelected.has(v.videoId) ? "checked" : ""} />
       ${thumbHtml}
       <div>
-        <div class="title" data-note>${v.title || v.videoId}</div>
-        <div class="meta">${metaStr}</div>
+        <button type="button" class="title" data-note>${escapeHtml(title)}</button>
+        <div class="meta">${escapeHtml(metaStr)}${showTrack ? ` <span class="track-row"><select data-track-cat aria-label="Category for tracking">${ui.categories.map((c) => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join("")}</select><button type="button" class="text-btn" data-track>Track</button></span>` : ""}</div>
         <div class="row-actions">
-          <button class="text-btn" data-note2>Open note</button>
-          <button class="text-btn" data-transcript ${hasTranscript(v) || isYoutubeNote(v) ? "" : "disabled"}>Open transcript</button>
-          <button class="text-btn" data-open2 ${synth || branch ? "disabled" : ""}>Open video</button>
-          <button class="text-btn" data-gemini>Gemini</button>
-          <button class="text-btn" data-del>Delete</button>
+          <button type="button" class="text-btn" data-note2>Open Note</button>
+          <button type="button" class="text-btn" data-transcript ${hasTranscript(v) || isYoutubeNote(v) ? "" : "disabled"}>Open Transcript</button>
+          ${openVideo}
+          <button type="button" class="text-btn" data-gemini>Gemini</button>
+          <button type="button" class="text-btn" data-del>Delete</button>
         </div>
       </div>`;
     el.querySelector("input").onchange = (e) => {
@@ -1598,21 +1791,34 @@ function renderHistory() {
     el.querySelector("[data-note]").onclick = () => openDoc(v, "note");
     el.querySelector("[data-note2]").onclick = () => openDoc(v, "note");
     el.querySelector("[data-transcript]").onclick = () => openDoc(v, "transcript");
-    el.querySelector("[data-open2]").onclick = () => {
-      if (synth || branch) return;
-      window.open(v.videoUrl || `https://www.youtube.com/watch?v=${v.videoId}`, "_blank");
-    };
     el.querySelector("[data-gemini]").onclick = () => openInGemini(v, false);
     el.querySelector("[data-del]").onclick = (e) => {
       e.stopPropagation();
       deleteHistoryItems([v]);
     };
+    const trackBtn = el.querySelector("[data-track]");
+    if (trackBtn) {
+      trackBtn.onclick = async (e) => {
+        e.stopPropagation();
+        if (!ui.helperOn) { toast("Start the helper to track a channel."); return; }
+        const cat = el.querySelector("[data-track-cat]")?.value || ui.categories[0]?.name || "";
+        const url = v.channelId && v.channelId !== "manual_ingest"
+          ? `https://www.youtube.com/channel/${v.channelId}`
+          : (v.videoUrl || `https://www.youtube.com/watch?v=${v.videoId}`);
+        const res = await api.addChannel(url, cat);
+        if (!res.success) { toast(res.error || "Could not track"); return; }
+        toast(`Tracking ${res.channel?.name || v.channelName || "channel"}`);
+        ui.channels = await api.getChannels().catch(() => ui.channels);
+        renderHistory();
+      };
+    }
     list.appendChild(el);
   });
   renderHistoryBulk();
 }
 
 function modelOptions(selected) {
+  selected = normalizeModelId(selected);
   const ids = MODELS.map((m) => m.id);
   const extra = selected && !ids.includes(selected) ? [{ id: selected, name: selected }] : [];
   return [...MODELS, ...extra]
@@ -1620,43 +1826,98 @@ function modelOptions(selected) {
     .join("");
 }
 
+async function paintKeysStatus() {
+  const el = $("keys-status");
+  if (!el) return;
+  if (!ui.helperOn) {
+    el.textContent = "Start the helper to save a key.";
+    return;
+  }
+  const status = await api.getSecrets().catch(() => ({ llm: false, openrouter: false, youtube: false }));
+  ui.llmReady = !!(status.llm || status.openrouter);
+  if (status.openrouter || status.llm) {
+    el.textContent = status.youtube
+      ? "OpenRouter key is on this Mac. YouTube Data API key is set."
+      : "OpenRouter key is on this Mac.";
+  } else {
+    el.textContent = "No OpenRouter key yet — Process will not run without one.";
+  }
+}
+
 async function renderSettings() {
   const state = await getState();
   $("send-tg").checked = state.uiSendTelegram !== false;
+  await paintKeysStatus();
   const details = await api.getCategorisationPrompt().catch(() => ({ prompt: "", model: "" }));
   const prompt = details.prompt || details.data?.prompt || "";
   $("sys-prompt").value = prompt || DEFAULT_CAT_PROMPT;
-  $("sys-model").innerHTML = modelOptions(details.model || details.data?.model || "gemini-3.1-flash-lite");
+  $("sys-model").innerHTML = modelOptions(details.model || details.data?.model || "google/gemini-3.1-flash-lite");
   const box = $("settings-cats");
   box.innerHTML = "";
   ui.categories.forEach((cat) => {
     const el = document.createElement("article");
     el.className = "card cat-card";
     el.style.gridTemplateColumns = "1fr";
+    const va = cat.visualAssets || { enabled: false, kinds: [], model: VISUAL_MODELS[0], mediaResolution: "default", materialize: "index" };
+    const vaModel = normalizeModelId(va.model || VISUAL_MODELS[0]);
     el.innerHTML = `
       <div>
-        <div class="title" data-open>${cat.name}</div>
+        <button type="button" class="title" data-open aria-expanded="false">${escapeHtml(cat.name)}</button>
         <div class="cat-body hidden">
-          <textarea data-prompt>${cat.prompt || ""}</textarea>
-          <select data-model>${modelOptions(cat.model || "gemini-3.1-flash-lite")}</select>
+          <label class="sr-only">Category Prompt</label>
+          <textarea data-prompt>${escapeHtml(cat.prompt || "")}</textarea>
+          <label class="sr-only">Category Model</label>
+          <select data-model aria-label="Category Model">${modelOptions(cat.model || "google/gemini-3.1-flash-lite")}</select>
+          <div class="visual-row">
+            <label class="visual-toggle"><input type="checkbox" data-visual-enabled ${va.enabled ? "checked" : ""}/> Visual Assets</label>
+            <div class="visual-config ${va.enabled ? "" : "hidden"}">
+              <div class="visual-kinds">${VISUAL_KINDS.map((k) => `
+                <label class="chip kind"><input type="checkbox" data-kind="${k}" ${(va.kinds || []).includes(k) ? "checked" : ""}/> ${k}</label>`).join("")}
+              </div>
+              <select data-visual-model aria-label="Visual Model">${VISUAL_MODELS.map((m) => `<option value="${m}" ${m === vaModel ? "selected" : ""}>${m.replace("google/gemini-", "")}</option>`).join("")}</select>
+              <label class="visual-toggle"><input type="checkbox" data-visual-high ${va.mediaResolution === "high" ? "checked" : ""}/> HIGH resolution (OCR, ~4x cost)</label>
+            </div>
+          </div>
           <div class="row-actions">
-            <button class="btn process" data-save>Save</button>
-            <button class="btn discard" data-del>Delete</button>
+            <button type="button" class="btn process" data-save>Save</button>
+            <button type="button" class="btn discard" data-del>Delete</button>
           </div>
         </div>
       </div>`;
     el.querySelector("[data-open]").onclick = () => {
-      el.querySelector(".cat-body").classList.toggle("hidden");
+      const body = el.querySelector(".cat-body");
+      const open = body.classList.toggle("hidden");
+      el.querySelector("[data-open]").setAttribute("aria-expanded", open ? "false" : "true");
+    };
+    const visEnabled = el.querySelector("[data-visual-enabled]");
+    visEnabled.onchange = () => {
+      el.querySelector(".visual-config").classList.toggle("hidden", !visEnabled.checked);
     };
     el.querySelector("[data-save]").onclick = async () => {
-      await api.saveCategory(cat.name, el.querySelector("[data-prompt]").value, el.querySelector("[data-model]").value);
+      const kinds = [...el.querySelectorAll("[data-kind]")].filter((k) => k.checked).map((k) => k.dataset.kind);
+      const visualAssets = visEnabled.checked
+        ? {
+            enabled: true,
+            kinds,
+            model: el.querySelector("[data-visual-model]").value,
+            mediaResolution: el.querySelector("[data-visual-high]").checked ? "high" : "default",
+            materialize: "index",
+          }
+        : undefined;
+      await api.saveCategory(cat.name, el.querySelector("[data-prompt]").value, el.querySelector("[data-model]").value, visualAssets);
       toast("Saved " + cat.name);
       ui.categories = await api.getCategories();
     };
     el.querySelector("[data-del]").onclick = async () => {
+      const snapshot = { ...cat, visualAssets: cat.visualAssets };
       await api.deleteCategory(cat.name);
       ui.categories = ui.categories.filter((c) => c.name !== cat.name);
       renderSettings();
+      toast(`Deleted ${snapshot.name}`, "Undo", async () => {
+        await api.saveCategory(snapshot.name, snapshot.prompt, snapshot.model, snapshot.visualAssets);
+        ui.categories = await api.getCategories();
+        renderSettings();
+      });
     };
     box.appendChild(el);
   });
@@ -1675,15 +1936,51 @@ async function loadAll() {
     api.getChannels().catch(() => []),
     api.getCategories().catch(() => []),
   ]);
-  ui.queue = queue.filter((v) => !isShortVideo(v));
-  const shorts = queue.filter((v) => isShortVideo(v));
-  if (shorts.length) api.discardVideos(shorts.map((v) => v.videoId)).catch(() => {});
+  ui.queue = queue;
   ui.channels = channels;
   ui.categories = categories;
   await loadHistory();
   renderPending();
   renderChannels();
   await refreshStatus();
+  hydrateChannelNames();
+}
+
+async function hydrateChannelNames() {
+  if (!ui.helperOn) return;
+  const rows = [
+    ...ui.queue.filter((v) => isPlaceholderChannelName(v.channelName)),
+    ...ui.history.filter((v) => !isSynthNote(v) && !isBranchNote(v) && isPlaceholderChannelName(v.channelName)),
+  ].slice(0, 20);
+  if (!rows.length) return;
+  let changed = false;
+  const pendingPatches = [];
+  for (const video of rows) {
+    try {
+      const id = await api.resolveIdentity(video.videoId);
+      if (!id?.channelName) continue;
+      video.channelName = id.channelName;
+      if (id.channelId && (!video.channelId || video.channelId === "manual_ingest")) video.channelId = id.channelId;
+      if (id.title && isPlaceholderChannelName(video.title)) video.title = id.title;
+      changed = true;
+      if (ui.history.some((h) => h.videoId === video.videoId)) persistVideo(video).catch(() => {});
+      if (ui.queue.some((q) => q.videoId === video.videoId)) {
+        pendingPatches.push({
+          videoId: video.videoId,
+          channelName: video.channelName,
+          channelId: video.channelId,
+          title: video.title,
+        });
+      }
+    } catch {
+      /* oEmbed miss */
+    }
+  }
+  if (pendingPatches.length) api.patchPending(pendingPatches).catch(() => {});
+  if (changed) {
+    renderPending();
+    renderHistory();
+  }
 }
 
 function wire() {
@@ -1710,7 +2007,7 @@ function wire() {
   $("composer-tall").onclick = () => {
     ui.composerTall = !ui.composerTall;
     $("note-composer").classList.toggle("tall", ui.composerTall);
-    $("composer-tall").textContent = ui.composerTall ? "Compact" : "Half height";
+    $("composer-tall").textContent = ui.composerTall ? "Compact" : "Half Height";
   };
   $("composer-input").addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") sendComposer();
@@ -1790,7 +2087,7 @@ function wire() {
     $("channel-url").value = "";
     await loadAll();
   };
-  $("history-search").oninput = renderHistory;
+  $("history-search").oninput = () => { renderHistory(); writeHash("history"); };
   $("send-tg").onchange = (e) => setState({ [keys().sendTelegram]: e.target.checked });
   $("save-prompt").onclick = async () => {
     await api.saveCategorisationPrompt($("sys-prompt").value, $("sys-model").value);
@@ -1804,6 +2101,55 @@ function wire() {
     ui.categories = await api.getCategories();
     renderSettings();
   };
+  const saveOr = $("save-or-key");
+  if (saveOr) saveOr.onclick = async () => {
+    if (!ui.helperOn) { toast("Start the helper to save a key."); return; }
+    const key = $("or-key").value.trim();
+    if (!key) { toast("Paste an OpenRouter key first."); return; }
+    try {
+      await api.saveSecrets({ openrouterApiKey: key });
+      $("or-key").value = "";
+      toast("OpenRouter key saved on this Mac.");
+      await refreshStatus();
+      await paintKeysStatus();
+      renderPending();
+    } catch (err) {
+      toast(String(err.message || err));
+    }
+  };
+  const saveYt = $("save-yt-key");
+  if (saveYt) saveYt.onclick = async () => {
+    if (!ui.helperOn) { toast("Start the helper to save a key."); return; }
+    const key = $("yt-key").value.trim();
+    if (!key) { toast("Paste a YouTube Data API key first."); return; }
+    try {
+      await api.saveSecrets({ googleApiKey: key });
+      $("yt-key").value = "";
+      toast("YouTube Data API key saved.");
+      await paintKeysStatus();
+    } catch (err) {
+      toast(String(err.message || err));
+    }
+  };
+  window.addEventListener("hashchange", () => applyHash());
+  window.addEventListener("beforeunload", (e) => {
+    if (!hasUnsavedWork()) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+}
+
+function hasUnsavedWork() {
+  if (Object.values(ui.composerDrafts).some((v) => String(v || "").trim())) return true;
+  const box = $("composer-input");
+  if (box && box.value.trim()) return true;
+  const desc = $("desc-editor");
+  const draft = $("desc-draft");
+  if (desc && draft && !draft.classList.contains("hidden")) {
+    const saved = String(ui.openNote?.description || ui.openNote?.descriptionBlock || "");
+    if (desc.value !== saved) return true;
+  }
+  return false;
 }
 
 let panelClosing = false;
@@ -1855,13 +2201,14 @@ async function init() {
   const state = await getState();
   ui._lastOpened = state.uiLastOpened ? new Date(state.uiLastOpened).getTime() : 0;
   ui.showTimestamps = state.uiShowTranscriptTimes !== false;
-  setTab(state.uiLastTab || "pending");
-  wire();
+  try { wire(); } catch (err) { console.error("wire failed", err); }
+  await refreshStatus();
   try {
     await loadAll();
   } catch {
     $("pending-list").innerHTML = `<div class="empty">Could not load data. Start the helper once so the extension can remember your worker login.</div>`;
   }
+  if (!applyHash()) setTab(state.uiLastTab || "pending");
   await setState({ [keys().lastOpened]: new Date().toISOString() });
 }
 

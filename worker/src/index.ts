@@ -4,11 +4,9 @@ import {
   addPending,
   analysisKey,
   discardPending,
-  isTrackedChannel,
   patchPending,
   readAnalyses,
   readChannels,
-  readDiscardedIds,
   readPending,
   removeChannel,
   removeFromAnalysisIndex,
@@ -19,11 +17,19 @@ import {
   KV_TRACKED_CHANNELS,
 } from "./store";
 import {
+  MIN_PENDING_SECONDS,
+  categoryAllowsShorts,
   decodeHtmlEntities,
-  displayChannelName,
-  findTrackedChannel,
   isPlaceholderChannelName,
 } from "./queue";
+import {
+  extractEntryXmlTag,
+  extractXmlTag,
+  fetchVideoMeta,
+  ingestNotification,
+  parseFeedEntries,
+  runScheduledIngest,
+} from "./ingest";
 
 /**
  * Cloudflare Worker — YouTube LLM Pipeline
@@ -43,44 +49,6 @@ type Env = {
   GOOGLE_API_KEY?: string;
   PUBSUB_CALLBACK_URL?: string;
 };
-
-const MIN_PENDING_SECONDS = 180; // skip YouTube Shorts / clips under 3 minutes
-
-function isoDurationToSeconds(iso: string | undefined): number | null {
-  if (!iso) return null;
-  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!match) return null;
-  return (Number(match[1] || 0) * 3600) + (Number(match[2] || 0) * 60) + Number(match[3] || 0);
-}
-
-function formatClock(total: number): string {
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-async function fetchVideoMeta(videoId: string, apiKey?: string): Promise<{ seconds: number | null; duration?: string; title?: string }> {
-  if (!apiKey) return { seconds: null };
-  try {
-    const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails,snippet&key=${apiKey}`
-    );
-    if (!res.ok) return { seconds: null };
-    const data: any = await res.json();
-    const item = data.items?.[0];
-    if (!item) return { seconds: null };
-    const seconds = isoDurationToSeconds(item.contentDetails?.duration);
-    return {
-      seconds,
-      duration: seconds != null ? formatClock(seconds) : undefined,
-      title: item.snippet?.title,
-    };
-  } catch {
-    return { seconds: null };
-  }
-}
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -132,8 +100,33 @@ const DEFAULT_CATEGORIES = [
     name: "web3 business",
     model: "gemini-3.1-flash-lite",
     prompt: `Analyze the transcript and provide:\n- Speaker identification with their roles/affiliations\n- Key topics developed in the transcript\n- Glossary of specialized terms\nIdentify and categorize the information within the transcript according to the following archetypes. If a category is not present, skip it:\n1. **Mental Models (The 'Why'):** Philosophical shifts or conceptual lenses used to view the problem. \n2. **Frameworks & Systems (The 'Structure'):** Repeatable processes, 2x2 matrices, or step-by-step methodologies developed by the speaker. \n3. **Tactical Tutorials (The 'How'):** Click-by-click or action-by-action instructions. Provide these as a numbered "SOP" (Standard Operating Procedure).\n4. **Deep Dives (The 'Mechanics'):** High-density technical explanations or granular breakdowns of a specific system \n5. **Interview Insights (The 'Nuance'):** If this is an interview, extract the non-obvious wisdom gained from the back-and-forth, including the speaker's personal "war stories."\n6. **Case Studies (The 'Proof'):** Real-world examples cited. Detail the Challenge, the Intervention, and the Result.\n7. **Heuristics & Red Flags (The 'Shortcuts'):** Rules of thumb, "if-this-then-that" shortcuts, and warning signs to watch out for.\n8. **Contrarian Takes (The 'Alpha'):** Ideas mentioned that go against the "common wisdom" of the industry.\n9. **Resource Stack (The 'Tools'):** A list of all software, books, hardware, or third-party services mentioned as essential.`
-  }
+  },
+  {
+    name: "short text extract",
+    model: "google/gemini-3.1-flash-lite",
+    prompt: "Reconstruct every readable on-screen text block from this video in reading order. Prefer the screen over speech. Output markdown a human can paste (prompts, lists, emails, tweets, configs). Skip talking head and UI chrome.",
+    visualAssets: {
+      enabled: true,
+      kinds: ["on_screen_text"],
+      model: "google/gemini-3.7-flash",
+      mediaResolution: "high",
+      materialize: "index",
+    },
+  },
 ];
+
+function seedCategories(list: any[]): { list: any[]; changed: boolean } {
+  const next = Array.isArray(list) ? list.slice() : [];
+  let changed = false;
+  if (!next.some((c) => String(c?.name || "").toLowerCase() === "short text extract")) {
+    const seed = DEFAULT_CATEGORIES.find((c) => c.name === "short text extract");
+    if (seed) {
+      next.push(seed);
+      changed = true;
+    }
+  }
+  return { list: next, changed };
+}
 
 // ────────────────────────────────────────
 // 1. PubSubHubbub Endpoints
@@ -158,65 +151,30 @@ app.post("/youtube/pubsub", async (c) => {
   const body = await c.req.text();
   console.log("PubSubHubbub notification received");
 
-  // Parse Atom XML — extract video info
-  const videoId = extractXmlTag(body, "yt:videoId");
-  const channelId = extractXmlTag(body, "yt:channelId");
-  const title = extractEntryXmlTag(body, "title") || extractXmlTag(body, "title");
-  const published = extractEntryXmlTag(body, "published") || extractXmlTag(body, "published");
-  const channelName = extractEntryXmlTag(body, "name") || extractXmlTag(body, "name");
+  let entries = parseFeedEntries(body);
+  if (!entries.length) {
+    const videoId = extractXmlTag(body, "yt:videoId");
+    const channelId = extractXmlTag(body, "yt:channelId");
+    if (videoId && channelId) {
+      entries = [{
+        videoId,
+        channelId,
+        title: extractEntryXmlTag(body, "title") || extractXmlTag(body, "title") || "",
+        channelName: extractEntryXmlTag(body, "name") || extractXmlTag(body, "name") || "",
+        publishedAt: extractEntryXmlTag(body, "published") || extractXmlTag(body, "published") || new Date().toISOString(),
+      }];
+    }
+  }
 
-  if (!videoId || !channelId) {
+  if (!entries.length) {
     console.error("Could not parse video/channel ID from notification");
-    return c.text("OK", 200); // Still return 200 to avoid re-delivery
-  }
-
-  console.log(`New video: "${title}" (${videoId}) from ${channelName} (${channelId})`);
-
-  const channels = await readChannels(c.env.YT_KV);
-  const matchedChannel = findTrackedChannel(channelId, channels);
-  if (!matchedChannel || !(await isTrackedChannel(c.env.YT_KV, channelId))) {
-    console.log(`Skipping untracked channel ${channelId}`);
     return c.text("OK", 200);
   }
 
-  const discarded = await readDiscardedIds(c.env.YT_KV);
-  if (discarded.has(videoId)) {
-    console.log("Previously discarded, skipping.");
-    return c.text("OK", 200);
+  for (const entry of entries) {
+    const result = await ingestNotification(c.env, entry, "ingest");
+    console.log(`Ingest ${entry.videoId}: ${result.action}${result.reason ? ` (${result.reason})` : ""}`);
   }
-
-  const meta = await fetchVideoMeta(videoId, c.env.GOOGLE_API_KEY);
-  if (meta.seconds != null && meta.seconds < MIN_PENDING_SECONDS) {
-    console.log(`Skipping short (${meta.duration || meta.seconds + "s"}): ${videoId}`);
-    return c.text("OK", 200);
-  }
-
-  // Check if already processed
-  const existing = await c.env.YT_KV.get(`${KV_PROCESSED_PREFIX}${videoId}`);
-  if (existing) {
-    console.log("Already processed, skipping.");
-    return c.text("OK", 200);
-  }
-
-  const category = matchedChannel.category;
-  const kvName = displayChannelName(matchedChannel);
-  const feedName = decodeHtmlEntities(channelName || "").trim();
-  const resolvedName = !isPlaceholderChannelName(kvName)
-    ? kvName
-    : (!isPlaceholderChannelName(feedName) ? feedName : kvName);
-
-  const result = await serialize(() => addPending(c.env.YT_KV, {
-    videoId,
-    title: meta.title || title || "Untitled",
-    channelId: matchedChannel.id,
-    channelName: resolvedName,
-    category,
-    publishedAt: published || new Date().toISOString(),
-    videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
-    addedAt: new Date().toISOString(),
-    duration: meta.duration,
-  }));
-  console.log(`Added to pending. Queue size: ${result.count}`);
 
   return c.text("OK", 200);
 });
@@ -230,19 +188,35 @@ app.get("/api/categories", async (c) => {
   if (!requireAuth(c)) return c.json({ error: "Unauthorized" }, 401);
   const raw = await c.env.YT_KV.get(KV_CATEGORIES);
   let categories = raw ? JSON.parse(raw) : [];
-  
-  if (categories.length === 0) {
+  if (!Array.isArray(categories) || categories.length === 0) {
     categories = DEFAULT_CATEGORIES;
     await c.env.YT_KV.put(KV_CATEGORIES, JSON.stringify(categories));
+    return c.json(categories);
   }
-  return c.json(categories);
+  const seeded = seedCategories(categories);
+  if (seeded.changed) {
+    await c.env.YT_KV.put(KV_CATEGORIES, JSON.stringify(seeded.list));
+  }
+  return c.json(seeded.list);
 });
 
 /** POST /api/categories */
 app.post("/api/categories", async (c) => {
   if (!requireAuth(c)) return c.json({ error: "Unauthorized" }, 401);
-  const { name, prompt, model } = await c.req.json();
+  const { name, prompt, model, visualAssets } = await c.req.json();
   if (!name || !prompt) return c.json({ error: "Missing name or prompt" }, 400);
+
+  // Only persist visual settings when the toggle is on — keeps old payloads from lingering
+  const visual =
+    visualAssets && visualAssets.enabled
+      ? {
+          enabled: true,
+          kinds: Array.isArray(visualAssets.kinds) ? visualAssets.kinds.slice(0, 12) : [],
+          model: visualAssets.model || "gemini-3.7-flash",
+          mediaResolution: visualAssets.mediaResolution === "high" ? "high" : "default",
+          materialize: visualAssets.materialize === "stills" ? "stills" : "index",
+        }
+      : undefined;
 
   const raw = await c.env.YT_KV.get(KV_CATEGORIES);
   let categories: any[] = raw ? JSON.parse(raw) : DEFAULT_CATEGORIES;
@@ -251,8 +225,10 @@ app.post("/api/categories", async (c) => {
   if (existingIndex !== -1) {
     categories[existingIndex].prompt = prompt;
     if (model) categories[existingIndex].model = model;
+    if (visual) categories[existingIndex].visualAssets = visual;
+    else delete categories[existingIndex].visualAssets;
   } else {
-    categories.push({ name, prompt, model: model || "gemini-3.1-flash-lite" });
+    categories.push({ name, prompt, model: model || "gemini-3.1-flash-lite", ...(visual ? { visualAssets: visual } : {}) });
   }
 
   await c.env.YT_KV.put(KV_CATEGORIES, JSON.stringify(categories));
@@ -412,15 +388,20 @@ app.post("/api/videos/pending", async (c) => {
   if (!requireAuth(c)) return c.json({ error: "Unauthorized" }, 401);
 
   const video = await c.req.json();
+  const restore = video?.source !== "ingest";
   if (video?.videoId && !video.duration && c.env.GOOGLE_API_KEY) {
     const meta = await fetchVideoMeta(video.videoId, c.env.GOOGLE_API_KEY);
-    if (meta.seconds != null && meta.seconds < MIN_PENDING_SECONDS) {
-      return c.json({ ok: true, skipped: "short", count: 0 });
+    if (!restore && meta.seconds != null && meta.seconds < MIN_PENDING_SECONDS) {
+      const raw = await c.env.YT_KV.get(KV_CATEGORIES);
+      let cats: any[] = [];
+      try { cats = raw ? JSON.parse(raw) : []; } catch { cats = []; }
+      if (!categoryAllowsShorts(video.category, cats)) {
+        return c.json({ ok: true, skipped: "short", count: 0 });
+      }
     }
     if (meta.duration) video.duration = meta.duration;
     if (meta.title && (!video.title || video.title === "YouTube video feed")) video.title = meta.title;
   }
-  const restore = video?.source !== "ingest";
   const result = await serialize(() => addPending(c.env.YT_KV, video, { restore }));
   return c.json({ ok: true, skipped: result.skipped, count: result.count });
 });
@@ -605,20 +586,6 @@ async function fetchChannelTitles(ids: string[], apiKey: string): Promise<Map<st
   return titles;
 }
 
-/** Simple XML tag extractor (no DOM parser needed for Atom) */
-function extractXmlTag(xml: string, tag: string): string | null {
-  // Handle both <tag>value</tag> and namespaced tags
-  const regex = new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`, "i");
-  const match = xml.match(regex);
-  return match ? match[1].trim() : null;
-}
-
-function extractEntryXmlTag(xml: string, tag: string): string | null {
-  const start = xml.search(/<entry[\s>]/i);
-  if (start < 0) return null;
-  return extractXmlTag(xml.slice(start), tag);
-}
-
 /** Trigger a Trigger.dev task via the API */
 async function triggerTask(env: Env, taskId: string, payload: any) {
   console.log(`Triggering task ${taskId}...`);
@@ -651,4 +618,9 @@ async function triggerTask(env: Env, taskId: string, payload: any) {
 
 app.get("/", (c) => c.json({ status: "ok", service: "yt-pipeline-worker" }));
 
-export default app;
+export default {
+  fetch: app.fetch,
+  scheduled: (_controller: ScheduledController, env: Env, ctx: ExecutionContext) => {
+    ctx.waitUntil(runScheduledIngest(env));
+  },
+};

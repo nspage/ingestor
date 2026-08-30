@@ -29,6 +29,11 @@ const CHANNEL_SELECTOR = [
   ".ytd-channel-name a",
   "yt-content-metadata-view-model a",
   ".yt-content-metadata-view-model__metadata-row a",
+  "yt-reel-channel-bar-view-model a",
+  ".ytReelChannelBarViewModelChannelName a",
+  "a.yt-core-attributed-string__link[href^='/@']",
+  "a[href^='/@']",
+  "a[href*='/channel/']",
 ].join(", ");
 
 const DURATION_SELECTOR = [
@@ -104,7 +109,22 @@ function watchTitle() {
 }
 
 function watchChannel() {
-  return document.querySelector("#upload-info .ytd-channel-name a")?.innerText || "Unknown";
+  const selectors = [
+    "#upload-info .ytd-channel-name a",
+    "ytd-channel-name a",
+    "yt-reel-channel-bar-view-model a",
+    ".ytReelChannelBarViewModelChannelName a",
+    "#channel-name a",
+    "a.ytp-title-channel-name",
+    "ytd-reel-player-header-renderer a[href^='/@']",
+    "a[href^='/@']",
+  ];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    const name = (el?.innerText || el?.textContent || "").replace(/\s+/g, " ").trim();
+    if (name && !/^(unknown|visit source)$/i.test(name)) return name;
+  }
+  return "";
 }
 
 function isTypingTarget(el) {
@@ -149,12 +169,15 @@ function ensurePanel() {
   if (panel) return panel;
   panel = document.createElement("div");
   panel.id = "ytp-pipeline-panel";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-modal", "true");
+  panel.setAttribute("aria-labelledby", "ytp-hd");
   panel.innerHTML = `
-    <div class="ytp-hd">ingestor</div>
+    <h2 id="ytp-hd" class="ytp-hd">ingestor</h2>
     <div id="ytp-badge" class="ytp-badge"></div>
-    <div id="ytp-cats" class="ytp-cats"></div>
+    <div id="ytp-cats" class="ytp-cats" role="group" aria-label="Category"></div>
     <div class="ytp-row">
-      <button type="button" id="ytp-send">Send to ingestor</button>
+      <button type="button" id="ytp-send">Send to Ingestor</button>
       <button type="button" id="ytp-cancel" class="ghost">Close</button>
     </div>
   `;
@@ -173,6 +196,8 @@ function showBadge(text) {
   if (!el) {
     el = document.createElement("div");
     el.id = "pipeline-inline-badge";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
     document.documentElement.appendChild(el);
   }
   el.textContent = text;
@@ -227,11 +252,6 @@ async function queueVideos(videos, openPanel) {
 async function decorateWatch() {
   const id = videoIdFromUrl();
   if (!id) return;
-
-  if (watchLooksShort()) {
-    setWatchBadge(id, "Too short for ingestor");
-    return;
-  }
 
   if (watchState.videoId === id) {
     showBadge(watchState.badge);
@@ -295,7 +315,7 @@ function openSendPanel(ctx, knownChannel) {
   const sendBtn = panel.querySelector("#ytp-send");
   catBox.innerHTML = "";
   sendBtn.disabled = false;
-  sendBtn.textContent = "Send to ingestor";
+  sendBtn.textContent = "Send to Ingestor";
   if (knownChannel) {
     badge.textContent = `Will use ${knownChannel.category}`;
     catBox.style.display = "none";
@@ -306,9 +326,14 @@ function openSendPanel(ctx, knownChannel) {
       const b = document.createElement("button");
       b.type = "button";
       b.textContent = name;
+      b.setAttribute("aria-pressed", "false");
       b.onclick = () => {
-        catBox.querySelectorAll("button").forEach((x) => x.classList.remove("on"));
+        catBox.querySelectorAll("button").forEach((x) => {
+          x.classList.remove("on");
+          x.setAttribute("aria-pressed", "false");
+        });
         b.classList.add("on");
+        b.setAttribute("aria-pressed", "true");
       };
       catBox.appendChild(b);
     });
@@ -342,6 +367,8 @@ function injectWatchButton() {
     "ytd-watch-metadata ytd-menu-renderer #top-level-buttons-computed",
     "ytd-watch-metadata #actions-inner #menu",
     "#top-level-buttons-computed",
+    "ytd-reel-player-overlay-renderer #actions",
+    "ytm-shorts-player-overlay-renderer",
   ];
   let menu = null;
   for (const s of selectors) {
@@ -352,7 +379,7 @@ function injectWatchButton() {
   const btn = document.createElement("button");
   btn.id = "antigravity-process-btn";
   btn.className = "antigravity-btn";
-  btn.textContent = "Send to ingestor";
+  btn.textContent = "Send to Ingestor";
   btn.onclick = async () => {
     try {
       const ctx = await sendRuntime({ type: "PAGE_CONTEXT" });
@@ -384,7 +411,7 @@ function injectChannelButton() {
   const btn = document.createElement("button");
   btn.id = "antigravity-track-btn";
   btn.className = "antigravity-btn";
-  btn.textContent = "Track channel";
+  btn.textContent = "Track Channel";
   btn.onclick = async () => {
     try {
       const ctx = await sendRuntime({ type: "PAGE_CONTEXT" });
@@ -416,7 +443,7 @@ function parseFromRoot(root, videoId, href) {
   const channelEl = root.querySelector?.(CHANNEL_SELECTOR);
   const durationEl = root.querySelector?.(DURATION_SELECTOR);
   const title = textOf(titleEl) || textOf(root.querySelector?.("a[href*='watch'], a[href*='/shorts/']")) || videoId;
-  const channelName = textOf(channelEl) || "Unknown";
+  const channelName = textOf(channelEl) || "";
   const channelHref = channelEl?.getAttribute?.("href") || channelEl?.href || "";
   const channelId = (channelHref.match(/\/channel\/(UC[\w-]+)/) || [])[1] || "manual_ingest";
   const duration = textOf(durationEl);
@@ -469,9 +496,11 @@ function pickHud() {
   if (el) return el;
   el = document.createElement("div");
   el.id = "ytp-pick-hud";
+  el.setAttribute("role", "status");
+  el.setAttribute("aria-live", "polite");
   el.innerHTML = `
     <span id="ytp-pick-label"></span>
-    <button type="button" id="ytp-pick-send">Send</button>
+    <button type="button" id="ytp-pick-send">Send to Ingestor</button>
     <button type="button" id="ytp-pick-cancel" class="ghost">Cancel</button>
   `;
   el.querySelector("#ytp-pick-send").onclick = (e) => {
@@ -495,7 +524,7 @@ function updatePickHud(override) {
   const send = el.querySelector("#ytp-pick-send");
   const n = pick.selected.size;
   label.textContent = override || (n
-    ? `${n} selected · ⌘⇧1 or Send`
+    ? `${n} selected · ⌘\u00a0⇧\u00a01 or Send to Ingestor`
     : "Pick mode · click videos · Esc to cancel");
   send.hidden = !pick.on || n === 0;
   syncLauncher();
@@ -522,8 +551,9 @@ function ensureLauncher() {
   el = document.createElement("button");
   el.id = "ytp-pick-launch";
   el.type = "button";
-  el.textContent = "Pick videos";
-  el.title = "⌘⇧1";
+  el.textContent = "Pick Videos";
+  el.title = "⌘\u00a0⇧\u00a01";
+  el.setAttribute("aria-label", "Pick Videos");
   el.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -547,7 +577,7 @@ async function enterPick() {
   pick.on = true;
   pick.selected = new Map();
   document.documentElement.classList.add("ytp-pick-mode");
-  updatePickHud("Pick videos · 0 selected");
+  updatePickHud("Pick Videos · 0 selected");
   pick.ctxPromise = sendRuntime({ type: "PAGE_CONTEXT" }).catch((err) => {
     if (isInvalidated(err)) return { helperOn: false, dead: true };
     return { helperOn: false };
@@ -610,12 +640,6 @@ function setPickHighlight(videoId, on, root) {
 
 function togglePickedVideo(parsed) {
   if (!parsed?.videoId) return;
-  const seconds = durationSeconds(parsed.duration);
-  if (seconds != null && seconds < 180) {
-    updatePickHud("Too short · skipped");
-    setTimeout(() => { if (pick.on) updatePickHud(); }, 900);
-    return;
-  }
   if ((pick.ctx?.pendingIds || []).includes(parsed.videoId)) {
     updatePickHud("Already in pending");
     setTimeout(() => { if (pick.on) updatePickHud(); }, 900);
