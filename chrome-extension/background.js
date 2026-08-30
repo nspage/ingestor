@@ -205,27 +205,6 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return;
   }
 
-  if (request.type === "PROCESS_VIDEO") {
-    (async () => {
-      try {
-        const on = await helperUp();
-        if (!on) {
-          sendResponse({ success: false, error: "Helper is off. Open the extension and click Start Helper." });
-          return;
-        }
-        const res = await fetch(`${LOCAL}/process`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ videos: [request.payload] }),
-        });
-        sendResponse(await res.json());
-      } catch (err) {
-        sendResponse({ success: false, error: err.message });
-      }
-    })();
-    return true;
-  }
-
   if (request.type === "QUEUE_VIDEOS") {
     (async () => {
       try {
