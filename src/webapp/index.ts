@@ -5,12 +5,12 @@ import { cors } from 'hono/cors'
 import { config } from 'dotenv'
 
 // Import logic for Chrome Extension endpoints
-import { getPendingVideos, removePendingVideos, getAllChannels, removeTrackedChannel, addTrackedChannel, getCategories, saveCategory, deleteCategory, renameCategory, getAllAnalyses, getDailyCost, updatePendingVideos, updateAllChannels, getCategorisationPromptDetails, saveCategorisationPrompt, addPendingVideo, isVideoProcessed, getFailedVideos, saveFailedVideo, clearFailedVideo } from '../trigger/youtube-pipeline/kv-client'
+import { getPendingVideos, addTrackedChannel, getAllChannels, updatePendingVideos, updateAllChannels, getCategorisationPromptDetails, saveCategorisationPrompt, saveFailedVideo } from '../trigger/youtube-pipeline/kv-client'
 import { processVideos } from '../trigger/youtube-pipeline/process-video'
 import { completeText } from '../trigger/youtube-pipeline/llm-client'
 import { classifyChannel } from '../trigger/youtube-pipeline/classify-channel'
 import { resolveChannelInfo, resolveVideoDuration, getTranscriptSample, fetchTranscriptCues, fetchVideoDescription, isPlaceholderChannelName, resolveVideoIdentity } from '../trigger/utils'
-import { subscribeSingleChannel, unsubscribeSingleChannel } from '../trigger/youtube-pipeline/pubsub-manager'
+import { subscribeSingleChannel } from '../trigger/youtube-pipeline/pubsub-manager'
 import { loadUserSecrets, saveUserSecrets, secretsStatus } from '../trigger/youtube-pipeline/secrets'
 
 config()
@@ -102,31 +102,7 @@ app.get('/api/extension/bootstrap', (c) => {
     return c.json({ success: true, workerUrl, token })
 })
 
-// 1. Get the pending queue
-app.get('/api/extension/queue', async (c) => {
-    try {
-        const pending = await getPendingVideos()
-        return c.json({ success: true, queue: pending })
-    } catch (e) {
-        console.error('Error fetching queue:', e)
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 2. Discard a pending video
-app.post('/api/extension/discard', async (c) => {
-    try {
-        const { videoId } = await c.req.json()
-        if (!videoId) return c.json({ success: false, error: 'Missing videoId' }, 400)
-        
-        await removePendingVideos([videoId])
-        return c.json({ success: true })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 3. Process a video (from queue OR directly from Youtube)
+// Process a video (from queue OR directly from Youtube)
 app.post('/api/extension/process', async (c) => {
     try {
         const body = await c.req.json()
@@ -169,113 +145,6 @@ app.get('/api/extension/process/:jobId', (c) => {
     return c.json({ success: true, ...job })
 })
 
-app.post('/api/extension/queue/restore', async (c) => {
-    try {
-        const video = await c.req.json()
-        if (!video?.videoId) return c.json({ success: false, error: 'Missing videoId' }, 400)
-        await addPendingVideo(video)
-        return c.json({ success: true })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-app.post('/api/extension/queue', async (c) => {
-    try {
-        const body = await c.req.json()
-        const videos = Array.isArray(body.videos) ? body.videos : [body]
-        const pending = await getPendingVideos()
-        const pendingIds = new Set(pending.map((v) => v.videoId).filter(Boolean))
-        const results: Array<{ videoId?: string; status: string; error?: string }> = []
-
-        for (const raw of videos) {
-            const video = raw || {}
-            const videoId = video.videoId
-            if (!videoId) {
-                results.push({ status: "error", error: "Missing videoId" })
-                continue
-            }
-            if (pendingIds.has(videoId)) {
-                results.push({ videoId, status: "exists" })
-                continue
-            }
-            if (await isVideoProcessed(videoId)) {
-                results.push({ videoId, status: "processed" })
-                continue
-            }
-
-            let duration = video.duration
-            if (!duration && video.videoUrl) {
-                duration = await resolveVideoDuration(video.videoUrl) || undefined
-            }
-
-            // Manual send always queues, including Shorts. Resolve names via oEmbed so we never persist "Unknown".
-            const identity = (isPlaceholderChannelName(video.channelName) || !video.title || isPlaceholderChannelName(video.title))
-                ? await resolveVideoIdentity(videoId).catch(() => null)
-                : null
-            let channelId = video.channelId && video.channelId !== "manual_ingest" ? video.channelId : ""
-            let channelName = !isPlaceholderChannelName(video.channelName) ? video.channelName : (identity?.channelName || "")
-            if (!channelId && identity?.authorUrl) {
-                const info = await resolveChannelInfo(identity.authorUrl).catch(() => null)
-                if (info?.id) channelId = info.id
-                if (info?.name && isPlaceholderChannelName(channelName)) channelName = info.name
-            }
-
-            const now = new Date().toISOString()
-            const entry = {
-                ...video,
-                videoId,
-                title: (video.title && !isPlaceholderChannelName(video.title) ? video.title : identity?.title) || videoId,
-                channelId: channelId || "manual_ingest",
-                channelName,
-                category: video.needsCategory ? (video.category || "") : (video.category || "Strategy"),
-                publishedAt: video.publishedAt || now,
-                videoUrl: video.videoUrl || `https://www.youtube.com/watch?v=${videoId}`,
-                addedAt: video.addedAt || now,
-                duration,
-                needsCategory: !!video.needsCategory,
-            }
-            await addPendingVideo(entry)
-            pendingIds.add(videoId)
-            results.push({ videoId, status: "queued" })
-        }
-
-        return c.json({ success: true, results })
-    } catch (e) {
-        console.error("Error queueing videos:", e)
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-app.get('/api/extension/failed', async (c) => {
-    try {
-        const failed = await getFailedVideos()
-        return c.json({ success: true, failed })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-app.post('/api/extension/failed/clear', async (c) => {
-    try {
-        const { videoId } = await c.req.json()
-        await clearFailedVideo(videoId)
-        return c.json({ success: true })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-app.get('/api/extension/processed/:videoId', async (c) => {
-    try {
-        const exists = await isVideoProcessed(c.req.param('videoId'))
-        return c.json({ success: true, exists })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 4. Track a channel
 app.post('/api/extension/add-channel', async (c) => {
     try {
         const body = await c.req.json()
@@ -315,82 +184,6 @@ app.post('/api/extension/add-channel', async (c) => {
     }
 })
 
-// 5. List channels
-app.get('/api/extension/channels', async (c) => {
-    try {
-        const channels = await getAllChannels()
-        return c.json({ success: true, channels })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 6. Remove a channel
-app.post('/api/extension/remove-channel', async (c) => {
-    try {
-        const { channelId } = await c.req.json()
-        if (!channelId) return c.json({ success: false, error: 'Missing channelId' }, 400)
-        
-        await removeTrackedChannel(channelId)
-        await unsubscribeSingleChannel(channelId).catch((err) => {
-            console.warn(`[Extension] Unsubscribe failed for ${channelId}:`, err)
-        })
-        return c.json({ success: true })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 7. Get categories
-app.get('/api/extension/categories', async (c) => {
-    try {
-        const categories = await getCategories()
-        return c.json({ success: true, categories })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 8. Save/Update category
-app.post('/api/extension/categories', async (c) => {
-    try {
-        const { name, prompt, model, visualAssets } = await c.req.json()
-        if (!name || !prompt) return c.json({ success: false, error: 'Missing name or prompt' }, 400)
-
-        await saveCategory(name, prompt, model, visualAssets)
-        return c.json({ success: true })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 9. Delete category
-app.post('/api/extension/categories/delete', async (c) => {
-    try {
-        const { name } = await c.req.json()
-        if (!name) return c.json({ success: false, error: 'Missing name' }, 400)
-        
-        await deleteCategory(name)
-        return c.json({ success: true })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 10. Rename category
-app.post('/api/extension/categories/rename', async (c) => {
-    try {
-        const { oldName, newName } = await c.req.json()
-        if (!oldName || !newName) return c.json({ success: false, error: 'Missing oldName or newName' }, 400)
-        
-        await renameCategory(oldName, newName)
-        return c.json({ success: true })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 10b. Timed transcript cues for the history viewer
 app.get('/api/extension/transcript/:videoId', async (c) => {
     try {
         const videoId = c.req.param('videoId')
@@ -416,27 +209,6 @@ app.get('/api/extension/description/:videoId', async (c) => {
     }
 })
 
-// 11. Get history (processed videos)
-app.get('/api/extension/history', async (c) => {
-    try {
-        const history = await getAllAnalyses()
-        return c.json({ success: true, history })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 12. Get daily cost
-app.get('/api/extension/cost', async (c) => {
-    try {
-        const costData = await getDailyCost()
-        return c.json({ success: true, ...costData })
-    } catch (e) {
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 13. Get video duration info
 app.get('/api/extension/video-info', async (c) => {
     try {
         const url = c.req.query('url')
@@ -449,29 +221,6 @@ app.get('/api/extension/video-info', async (c) => {
     }
 })
 
-// 14. Update pending video category
-app.post('/api/extension/queue/update-category', async (c) => {
-    try {
-        const { videoId, category } = await c.req.json()
-        if (!videoId || !category) return c.json({ success: false, error: 'Missing videoId or category' }, 400)
-
-        const pending = await getPendingVideos()
-        const index = pending.findIndex(v => v.videoId === videoId)
-        if (index === -1) {
-            return c.json({ success: false, error: 'Video not found in pending queue' }, 404)
-        }
-
-        pending[index].category = category
-        pending[index].needsCategory = false
-        await updatePendingVideos(pending)
-        return c.json({ success: true })
-    } catch (e) {
-        console.error('Error updating pending video category:', e)
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 15. Classify a video transcript using Gemini and the categorization prompt
 app.post('/api/extension/classify-video', async (c) => {
     try {
         const { videoId } = await c.req.json()
@@ -535,30 +284,6 @@ Instructions:
     }
 })
 
-// 16. Update channel configuration (name and category)
-app.post('/api/extension/channels/update', async (c) => {
-    try {
-        const { channelId, name, category } = await c.req.json()
-        if (!channelId || !name || !category) return c.json({ success: false, error: 'Missing channelId, name, or category' }, 400)
-
-        const channels = await getAllChannels()
-        const index = channels.findIndex(ch => ch.id === channelId)
-        if (index === -1) {
-            channels.push({ id: channelId, name, category })
-        } else {
-            channels[index].name = name
-            channels[index].category = category
-        }
-
-        await updateAllChannels(channels)
-        return c.json({ success: true })
-    } catch (e) {
-        console.error('Error updating channel:', e)
-        return c.json({ success: false, error: String(e) }, 500)
-    }
-})
-
-// 17. Get categorization prompt
 app.get('/api/extension/categorisation-prompt', async (c) => {
     try {
         const details = await getCategorisationPromptDetails()
