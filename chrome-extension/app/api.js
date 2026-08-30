@@ -169,16 +169,10 @@ export async function isProcessed(videoId) {
 }
 
 export async function discardVideos(videoIds) {
-  try {
-    await workerFetch("/api/videos/pending", {
-      method: "DELETE",
-      body: JSON.stringify({ videoIds }),
-    });
-  } catch {
-    for (const videoId of videoIds) {
-      await localFetch("/discard", { method: "POST", body: JSON.stringify({ videoId }) });
-    }
-  }
+  await workerFetch("/api/videos/pending", {
+    method: "DELETE",
+    body: JSON.stringify({ videoIds }),
+  });
   invalidateContext();
 }
 
