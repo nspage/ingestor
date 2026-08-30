@@ -4,10 +4,8 @@ import type { PendingVideo, ProcessedVideo } from "./config";
 /**
  * REST client for the Cloudflare Worker KV API.
  *
- * The Worker exposes a simple CRUD API on top of Cloudflare KV.
- * This client is used by Trigger.dev tasks to read/write video state.
- *
- * Base URL is set via WORKER_BASE_URL environment variable.
+ * Used by the local helper (Process, classify, add-channel) to read/write
+ * Inbox state. Base URL is WORKER_BASE_URL.
  */
 
 function getBaseUrl(): string {

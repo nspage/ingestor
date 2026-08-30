@@ -32,12 +32,12 @@ import {
 } from "./ingest";
 
 /**
- * Cloudflare Worker — YouTube LLM Pipeline
+ * Cloudflare Worker — ingestor Inbox store
  *
  * Public-facing endpoints:
  *  1. /youtube/pubsub  — PubSubHubbub verification (GET) + notification (POST)
- *  2. /telegram/webhook — Telegram callback queries (approval buttons)
- *  3. /api/videos/*    — REST API for KV state (used by Trigger.dev tasks)
+ *  2. /api/*           — REST for pending videos, channels, categories, notes
+ *  3. scheduled cron   — RSS backfill + PubSub lease renewal
  */
 
 type Env = {
@@ -179,7 +179,7 @@ app.post("/youtube/pubsub", async (c) => {
 });
 
 // ────────────────────────────────────────
-// 2. REST API for Trigger.dev Tasks
+// 2. Inbox REST (KV)
 // ────────────────────────────────────────
 
 /** GET /api/categories */
