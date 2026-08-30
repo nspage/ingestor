@@ -581,13 +581,18 @@ function ensureLauncher() {
   el = document.createElement("button");
   el.id = "ytp-pick-launch";
   el.type = "button";
-  el.textContent = "Pick Videos";
-  el.title = "⌘\u00a0⇧\u00a01";
-  el.setAttribute("aria-label", "Pick Videos");
+  el.title = "Pipeline";
+  el.setAttribute("aria-label", "Pipeline");
+  el.setAttribute("aria-expanded", "false");
+  const img = document.createElement("img");
+  img.src = chrome.runtime.getURL("img/pacman.png");
+  img.alt = "";
+  img.draggable = false;
+  el.appendChild(img);
   el.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    togglePick();
+    togglePacMenu();
   });
   document.documentElement.appendChild(el);
   return el;
@@ -596,6 +601,16 @@ function ensureLauncher() {
 function syncLauncher() {
   const el = ensureLauncher();
   el.hidden = !!pick.on;
+  if (!el.hidden) el.setAttribute("aria-expanded", isPacMenuOpen() ? "true" : "false");
+}
+
+function isPacMenuOpen() {
+  return document.getElementById("ytp-pac-menu")?.classList.contains("open") || false;
+}
+
+function togglePacMenu() {
+  // Implemented with the contextual menu; pacman opens it from the next commit on.
+  togglePick();
 }
 
 async function enterPick() {

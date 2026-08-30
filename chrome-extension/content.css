@@ -132,19 +132,29 @@ ytd-rich-grid-media.ytp-pick-on {
   right: 16px;
   bottom: 16px;
   z-index: 10000;
-  background: #17181c;
-  color: #ececec;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border: 1px solid #6b75d6;
   border-radius: 999px;
-  padding: 7px 12px;
-  font: 12px/1.3 ui-sans-serif, system-ui, sans-serif;
-  font-weight: 650;
+  background: #17181c;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
+#ytp-pick-launch img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
 #ytp-pick-launch[hidden] { display: none; }
-#ytp-pick-launch:hover { filter: brightness(1.08); }
+#ytp-pick-launch:hover { filter: brightness(1.15); }
 #ytp-pick-launch:focus-visible,
 #ytp-pick-hud button:focus-visible {
   outline: 2px solid #6b75d6;
