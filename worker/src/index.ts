@@ -618,6 +618,8 @@ async function triggerTask(env: Env, taskId: string, payload: any) {
 
 app.get("/", (c) => c.json({ status: "ok", service: "yt-pipeline-worker" }));
 
+export { app };
+
 export default {
   fetch: app.fetch,
   scheduled: (_controller: ScheduledController, env: Env, ctx: ExecutionContext) => {
