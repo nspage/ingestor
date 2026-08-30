@@ -125,11 +125,57 @@ test("DELETE /api/videos/pending takes { videoIds } and removes them", async () 
   assert.equal(queue.some((v: { videoId: string }) => v.videoId === "vid-d"), false);
 });
 
-// ── Completion envelope: saving a note vs the pending queue ──
-// Characterization of today's semantics (issue #5): POST /api/videos/processed
-// only stores the note — removing the video from pending is left to each writer
-// (helper process-video.ts, extension importGeminiNote). These tests pin the
-// envelope so the shared-completion change cannot silently alter it.
+test("DELETE /api/videos/pending refuses ids that already have a note", async () => {
+  const kv = mockKv(pendingSeed(["vid-f"]));
+  await app.request(
+    "/api/videos/processed",
+    auth({ method: "POST", body: noteBody("vid-e") }),
+    env(kv)
+  );
+  // vid-e has a note but is not pending; discarding it must be a no-op that
+  // does not add a processed video to the discarded list.
+  const res = await app.request(
+    "/api/videos/pending",
+    auth({
+      method: "DELETE",
+      body: JSON.stringify({ videoIds: ["vid-e", "vid-f"] }),
+    }),
+    env(kv)
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.removed, 1);
+  assert.deepEqual(body.skipped, ["vid-e"]);
+  const listed = await app.request("/api/videos/pending", auth(), env(kv));
+  const queue = await listed.json();
+  assert.equal(queue.some((v: { videoId: string }) => v.videoId === "vid-e"), false);
+  assert.equal(queue.some((v: { videoId: string }) => v.videoId === "vid-f"), false);
+  // Completion then undo: the note delete does not resurrect the pending row…
+  await app.request(
+    "/api/videos/processed/vid-e?date=2026-02-01",
+    auth({ method: "DELETE" }),
+    env(kv)
+  );
+  const after = await app.request("/api/videos/pending", auth(), env(kv));
+  assert.equal((await after.json()).some((v: { videoId: string }) => v.videoId === "vid-e"), false);
+  // …and re-ingesting the same video is NOT blocked by a stale discarded entry.
+  const reingest = await app.request(
+    "/api/videos/pending",
+    auth({
+      method: "POST",
+      body: JSON.stringify({ videoId: "vid-e", title: "E", source: "ingest" }),
+    }),
+    env(kv)
+  );
+  assert.equal(reingest.status, 200);
+  const reborn = await app.request("/api/videos/pending", auth(), env(kv));
+  assert.equal((await reborn.json()).some((v: { videoId: string }) => v.videoId === "vid-e"), true);
+});
+
+// ── Completion envelope: saving a note completes the inbox item ──
+// Shared completion (issue #5): POST /api/videos/processed removes the video
+// from pending itself — writers no longer do their own cleanup. Undoing the
+// note does NOT bring it back; restore is an explicit client decision.
 
 function pendingSeed(ids: string[]): Record<string, string> {
   return {
@@ -156,7 +202,7 @@ function noteBody(videoId: string, extra: Record<string, unknown> = {}): string 
   });
 }
 
-test("POST /api/videos/processed stores the note and leaves pending untouched (writer's job today)", async () => {
+test("POST /api/videos/processed completes a pending video", async () => {
   const kv = mockKv(pendingSeed(["vid-e", "vid-f"]));
   const res = await app.request(
     "/api/videos/processed",
@@ -164,10 +210,11 @@ test("POST /api/videos/processed stores the note and leaves pending untouched (w
     env(kv)
   );
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true });
+  assert.deepEqual(await res.json(), { ok: true, removedFromPending: 1 });
   const listed = await app.request("/api/videos/pending", auth(), env(kv));
   const queue = await listed.json();
-  assert.equal(queue.some((v: { videoId: string }) => v.videoId === "vid-e"), true);
+  assert.equal(queue.some((v: { videoId: string }) => v.videoId === "vid-e"), false);
+  assert.equal(queue.some((v: { videoId: string }) => v.videoId === "vid-f"), true);
   const history = await app.request("/api/videos/analyses?date=2026-02-01", auth(), env(kv));
   const notes = await history.json();
   assert.equal(notes.length, 1);
@@ -182,7 +229,7 @@ test("POST /api/videos/processed without a pending row still saves the note", as
     env(kv)
   );
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true });
+  assert.deepEqual(await res.json(), { ok: true, removedFromPending: 0 });
   const history = await app.request("/api/videos/analyses?date=2026-02-01", auth(), env(kv));
   const notes = await history.json();
   assert.equal(notes.length, 1);
@@ -203,7 +250,7 @@ test("DELETE /api/videos/processed undoes the note but does not restore pending"
   assert.equal(del.status, 200);
   const listed = await app.request("/api/videos/pending", auth(), env(kv));
   const queue = await listed.json();
-  assert.equal(queue.some((v: { videoId: string }) => v.videoId === "vid-h"), true);
+  assert.equal(queue.some((v: { videoId: string }) => v.videoId === "vid-h"), false);
   const history = await app.request("/api/videos/analyses?date=2026-02-01", auth(), env(kv));
   const notes = await history.json();
   assert.equal(notes.length, 0);
