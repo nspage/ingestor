@@ -1,6 +1,7 @@
 import * as api from "./app/api.js";
 import { getState, setState, keys } from "./app/state.js";
 import { formatWhen, thumbUrl } from "./app/duration.js";
+import { decodeHtmlEntities, isPlaceholderChannelName } from "./app/inbox-rules.js";
 import { renderMarkdown, renderDescription, enrichDescription, renderTranscript, hasTranscript, transcriptCues, transcriptCopyText, isGeminiNote, splitAnalysisTurns, joinAnalysisTurns, gfmToTsv, escapeHtml } from "./app/markdown.js";
 
 const MODELS = [
@@ -913,26 +914,9 @@ function channelName(id) {
   return ui.channels.find((c) => c.id === id)?.name || "";
 }
 
-function decodeHtmlName(value) {
-  return String(value || "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'");
-}
-
-function isPlaceholderChannelName(name) {
-  const trimmed = decodeHtmlName(name).trim();
-  if (!trimmed) return true;
-  if (/^(unknown channel|unknown|visit source|youtube video feed|youtube|untitled)$/i.test(trimmed)) return true;
-  return /^channel-\d+$/i.test(trimmed);
-}
-
 function videoChannelLabel(video) {
-  const stored = decodeHtmlName(video?.channelName).trim();
-  const fromList = decodeHtmlName(channelName(video?.channelId)).trim();
+  const stored = decodeHtmlEntities(video?.channelName).trim();
+  const fromList = decodeHtmlEntities(channelName(video?.channelId)).trim();
   if (!isPlaceholderChannelName(stored)) return stored;
   if (!isPlaceholderChannelName(fromList)) return fromList;
   return "";
@@ -945,7 +929,7 @@ function isTrackedVideo(video) {
 }
 
 function channelCardName(ch) {
-  const name = decodeHtmlName(ch.name).trim();
+  const name = decodeHtmlEntities(ch.name).trim();
   return isPlaceholderChannelName(name) ? (ch.id || name) : name;
 }
 
