@@ -8,7 +8,7 @@ This is what runs after the [README](../README.md) setup. Your queue lives in **
 2. **Worker + KV** store pending videos, channels, categories, and notes.
 3. **Chrome extension** is the dashboard (Pending, Channels, History).
 4. **Local helper** (`npm run helper:install`) fetches transcripts and calls **your** OpenRouter key when you click Process. Paste the key in the side-panel Settings (stored at `~/.ingestor/secrets.env`). Gemini via Google AI Studio is used for the visual pass through OpenRouter. Gemini Web import in the extension is unchanged.
-5. **Optional delivery:** Telegram checkbox in the panel; nightly digest if `EMAIL_TO` and `RESEND_API_KEY` are set (`TIMEZONE` in `.env`, default UTC, cron 21:00).
+5. **Optional delivery:** Telegram checkbox in the panel. The nightly email digest is not shipped.
 
 ## Secrets
 

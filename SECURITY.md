@@ -6,7 +6,7 @@ The OpenRouter key belongs on the helper (extension Settings writes `~/.ingestor
 
 ## If something leaked
 
-1. Rotate the affected key where it was issued (OpenRouter, Google AI Studio, YouTube Data API, Cloudflare, Telegram, Resend).
+1. Rotate the affected key where it was issued (OpenRouter, Google AI Studio, YouTube Data API, Cloudflare, Telegram).
 2. `npx wrangler secret put WORKER_API_SECRET` on the worker, and update local `.env` to match.
 3. Treat `TELEGRAM_CHAT_ID` as personal data, not just a config value.
 

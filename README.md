@@ -10,7 +10,7 @@ Not on the Chrome Web Store. Load the unpacked extension from this repo. **macOS
 - Cloudflare Worker + KV: **your** queue, channels, and notes
 - Local helper: fetches transcripts (YouTube blocks most cloud IPs) and calls **your** OpenRouter (or Gemini) key
 - Optional: open the video in Gemini Web and import the thread as a note
-- Optional: Telegram delivery and a nightly email digest
+- Optional: Telegram delivery of finished notes (the nightly email digest is not shipped)
 
 Process is billed to the OpenRouter key you paste in Settings. Visual assets are off until you opt in per category (extra video tokens). `short text extract` is on by default so scrolling Shorts with on-screen prompts become notes.
 
@@ -21,7 +21,7 @@ Process is billed to the OpenRouter key you paste in Settings. Visual assets are
 - A [Cloudflare](https://dash.cloudflare.com/) account (free KV is enough)
 - An [OpenRouter](https://openrouter.ai/keys) API key (paste it in the extension Settings; no terminal)
 
-Optional: YouTube Data API key (titles/durations), Telegram bot, [Resend](https://resend.com/) for email.
+Optional: YouTube Data API key (titles/durations), Telegram bot.
 
 ## Setup
 
