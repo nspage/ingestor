@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 config({ override: true });
-import { getLatestVideoIds, getTranscriptSample } from "../utils";
+import { getLatestVideoIds, getTranscriptSample } from "./utils";
 import { GEMINI_MODEL } from "./config";
 import { getCategorisationPromptDetails } from "./kv-client";
 import { completeText } from "./llm-client";

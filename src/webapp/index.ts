@@ -5,13 +5,13 @@ import { cors } from 'hono/cors'
 import { config } from 'dotenv'
 
 // Import logic for Chrome Extension endpoints
-import { getPendingVideos, addTrackedChannel, getAllChannels, updatePendingVideos, updateAllChannels, getCategorisationPromptDetails, saveCategorisationPrompt, saveFailedVideo } from '../trigger/youtube-pipeline/kv-client'
-import { processVideos } from '../trigger/youtube-pipeline/process-video'
-import { completeText } from '../trigger/youtube-pipeline/llm-client'
-import { classifyChannel } from '../trigger/youtube-pipeline/classify-channel'
-import { resolveChannelInfo, resolveVideoDuration, getTranscriptSample, fetchTranscriptCues, fetchVideoDescription, isPlaceholderChannelName, resolveVideoIdentity } from '../trigger/utils'
-import { subscribeSingleChannel } from '../trigger/youtube-pipeline/pubsub-manager'
-import { loadUserSecrets, saveUserSecrets, secretsStatus } from '../trigger/youtube-pipeline/secrets'
+import { getPendingVideos, addTrackedChannel, getAllChannels, updatePendingVideos, updateAllChannels, getCategorisationPromptDetails, saveCategorisationPrompt, saveFailedVideo } from '../helper/kv-client'
+import { processVideos } from '../helper/process-video'
+import { completeText } from '../helper/llm-client'
+import { classifyChannel } from '../helper/classify-channel'
+import { resolveChannelInfo, resolveVideoDuration, getTranscriptSample, fetchTranscriptCues, fetchVideoDescription, isPlaceholderChannelName, resolveVideoIdentity } from '../helper/utils'
+import { subscribeSingleChannel } from '../helper/pubsub-manager'
+import { loadUserSecrets, saveUserSecrets, secretsStatus } from '../helper/secrets'
 
 config()
 loadUserSecrets()

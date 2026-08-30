@@ -2,7 +2,7 @@ import "dotenv/config";
 import { YoutubeTranscript } from "youtube-transcript";
 import { GEMINI_MODEL, SHORT_TEXT_CATEGORY, type CategoryVisualAssets, type ContentCategory, type ProcessedVideo, type VisualAsset } from "./config";
 import { removePendingVideos, saveProcessedVideo, incrementDailyCost, getCategories } from "./kv-client";
-import { sendTelegramDocument, normalizeCues, fetchVideoDescription, isPlaceholderChannelName, resolveVideoIdentity, resolveChannelInfo } from "../utils";
+import { sendTelegramDocument, normalizeCues, fetchVideoDescription, isPlaceholderChannelName, resolveVideoIdentity, resolveChannelInfo } from "./utils";
 import { calculateCost, completeText, completeVisual } from "./llm-client";
 
 export type ProcessVideoInput = {
