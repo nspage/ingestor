@@ -46,14 +46,6 @@ export async function getPendingVideos(): Promise<PendingVideo[]> {
   return res.json();
 }
 
-/** Remove specific videos from the pending queue (after approval/skip) */
-export async function removePendingVideos(videoIds: string[]): Promise<void> {
-  await workerFetch("/api/videos/pending", {
-    method: "DELETE",
-    body: JSON.stringify({ videoIds }),
-  });
-}
-
 /** Patch fields on existing pending videos. Does not replace the queue or resurrect discarded ids. */
 export async function updatePendingVideos(pending: PendingVideo[]): Promise<void> {
   await workerFetch("/api/videos/pending", {
