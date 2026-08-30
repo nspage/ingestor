@@ -1104,6 +1104,7 @@ function renderPending() {
 function pendingCard(video) {
   const el = document.createElement("article");
   const job = ui.jobs.get(video.videoId);
+  const noLlm = ui.helperOn && !ui.llmReady;
   const canProcess = ui.helperOn && ui.llmReady && hasRealCategory(video) && !needsCategory(video);
   const title = video.title || video.videoId;
   const url = video.videoUrl || `https://www.youtube.com/watch?v=${video.videoId}`;
@@ -1117,7 +1118,7 @@ function pendingCard(video) {
       <div class="meta">${categorySelectHtml(video)} ${categoryHasVisual(video) ? `<span class="chip visual-chip">visual</span>` : ""} <button type="button" class="change" data-copy-desc="${escapeHtml(video.videoId)}">Copy Description</button></div>
       <div class="row-actions">
         <button type="button" class="btn process" data-gemini="${escapeHtml(video.videoId)}">Gemini</button>
-        <button type="button" class="change" data-process="${escapeHtml(video.videoId)}" ${canProcess ? "" : "disabled"}>API Process</button>
+        <button type="button" class="change" data-process="${escapeHtml(video.videoId)}" ${canProcess ? "" : "disabled"} title="${noLlm ? "Add your OpenRouter key in Settings" : canProcess ? "Process with the helper (transcript + LLM)" : "Choose a category first"}">API Process</button>
         <button type="button" class="btn discard" data-discard="${escapeHtml(video.videoId)}">Discard</button>
         ${job ? `<span class="meta">${escapeHtml(job)}</span>` : ""}
       </div>
