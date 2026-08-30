@@ -177,38 +177,27 @@ export async function discardVideos(videoIds) {
 }
 
 export async function restoreVideo(video) {
-  try {
-    await workerFetch("/api/videos/pending", {
-      method: "POST",
-      body: JSON.stringify(video),
-    });
-  } catch {
-    await localFetch("/queue/restore", { method: "POST", body: JSON.stringify(video) });
-  }
+  await workerFetch("/api/videos/pending", {
+    method: "POST",
+    body: JSON.stringify(video),
+  });
   invalidateContext();
 }
 
 export async function queueVideos(videos) {
-  try {
-    const data = await localFetch("/queue", { method: "POST", body: JSON.stringify({ videos }) });
-    invalidateContext();
-    return data;
-  } catch (err) {
-    if (!String(err.message || err).includes("404")) throw err;
-    const results = [];
-    for (const video of videos) {
-      try {
-        await restoreVideo(video);
-        results.push({ videoId: video.videoId, status: "queued" });
-      } catch (e) {
-        results.push({ videoId: video.videoId, status: "error", error: String(e.message || e) });
-      }
+  const results = [];
+  for (const video of videos) {
+    try {
+      await restoreVideo(video);
+      results.push({ videoId: video.videoId, status: "queued" });
+    } catch (e) {
+      results.push({ videoId: video.videoId, status: "error", error: String(e.message || e) });
     }
-    const queued = results.filter((r) => r.status === "queued").length;
-    if (!queued) throw err;
-    invalidateContext();
-    return { success: true, results };
   }
+  const queued = results.filter((r) => r.status === "queued").length;
+  if (!queued) throw new Error(results[0]?.error || "Failed to queue");
+  invalidateContext();
+  return { success: true, results };
 }
 
 function withCategory(video, category) {
