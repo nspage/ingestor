@@ -104,23 +104,13 @@ export async function getQueue() {
 }
 
 export async function getChannels() {
-  try {
-    const list = await workerFetch("/api/channels");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/channels");
-    return data.channels || [];
-  }
+  const list = await workerFetch("/api/channels");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getCategories() {
-  try {
-    const list = await workerFetch("/api/categories");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/categories");
-    return data.categories || [];
-  }
+  const list = await workerFetch("/api/categories");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getDescription(videoId, channelId) {
@@ -316,11 +306,7 @@ export async function deleteCategory(name) {
 }
 
 export async function getCategorisationPrompt() {
-  try {
-    return await workerFetch("/api/categorisation-prompt");
-  } catch {
-    return localFetch("/categorisation-prompt");
-  }
+  return workerFetch("/api/categorisation-prompt");
 }
 
 export async function saveCategorisationPrompt(prompt, model) {
