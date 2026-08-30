@@ -1219,6 +1219,10 @@ function openInGemini(video, fromPending) {
     duration: video.duration,
     processedAt: video.processedAt,
     sourceVideoIds: video.sourceVideoIds,
+    // Keep writer/visual state so an Undo restore puts back what was there (issue #5)
+    ...(video.analysisSource ? { analysisSource: video.analysisSource } : {}),
+    ...(Array.isArray(video.assets) && video.assets.length ? { assets: video.assets } : {}),
+    ...(video.visualStatus ? { visualStatus: video.visualStatus, ...(video.visualNote ? { visualNote: video.visualNote } : {}) } : {}),
     ...(video.branchSource ? { branchSource: video.branchSource } : {}),
     ...(video.geminiChatUrl ? { geminiChatUrl: video.geminiChatUrl } : {}),
   };
