@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { YoutubeTranscript } from "youtube-transcript";
 import { GEMINI_MODEL, SHORT_TEXT_CATEGORY, type CategoryVisualAssets, type ContentCategory, type ProcessedVideo, type VisualAsset } from "./config";
-import { removePendingVideos, saveProcessedVideo, incrementDailyCost, getCategories } from "./kv-client";
+import { saveProcessedVideo, incrementDailyCost, getCategories } from "./kv-client";
 import { sendTelegramDocument, normalizeCues, fetchVideoDescription, isPlaceholderChannelName, resolveVideoIdentity, resolveChannelInfo } from "./utils";
 import { calculateCost, completeText, completeVisual } from "./llm-client";
 
@@ -372,6 +372,7 @@ export async function processVideos(payload: { videos: ProcessVideoInput[] }) {
           descriptionStatus: description ? "draft" : undefined,
           analysis: finalAnalysis,
           processedAt: new Date().toISOString(),
+          analysisSource: "helper",
           assets: visual?.assets.length ? visual.assets : undefined,
           // Status is only meaningful when the pass produced nothing
           visualStatus: visual && !visual.assets.length ? visual.status : undefined,
@@ -402,9 +403,8 @@ export async function processVideos(payload: { videos: ProcessVideoInput[] }) {
       await new Promise((r) => setTimeout(r, 1000));
     }
 
-    // Remove processed from pending
-    const doneIds = results.filter((r) => r.status === "success").map((r) => r.videoId);
-    if (doneIds.length > 0) await removePendingVideos(doneIds);
+    // Pending cleanup happens in the Worker: saveProcessedVideo → POST
+    // /api/videos/processed completes the inbox item (issue #5).
 
     const ok = results.filter((r) => r.status === "success").length;
     const fail = results.filter((r) => r.status === "error").length;

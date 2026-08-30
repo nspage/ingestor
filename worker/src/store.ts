@@ -20,6 +20,8 @@ export const KV_UNTRACKED = "untracked_channels";
 export const KV_STORE_BLOB = "store_blob_v2";
 export const KV_ANALYSIS_PREFIX = "analysis:";
 export const KV_ANALYSIS_INDEX = "analysis_index";
+/** Processed markers: `processed:<videoId>` = "1" once a note exists. */
+export const KV_PROCESSED_PREFIX = "processed:";
 
 let mutationChain: Promise<unknown> = Promise.resolve();
 
@@ -31,7 +33,7 @@ export function serialize<T>(fn: () => Promise<T>): Promise<T> {
 
 type Kv = {
   get(key: string): Promise<string | null>;
-  put(key: string, value: string): Promise<void>;
+  put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void>;
   delete(key: string): Promise<void>;
   list(opts: { prefix: string; cursor?: string }): Promise<{
     keys: Array<{ name: string }>;
@@ -159,18 +161,22 @@ export async function addPending(
 export async function discardPending(
   kv: Kv,
   videoIds: string[]
-): Promise<{ removed: number; count: number }> {
+): Promise<{ removed: number; skipped: string[]; count: number }> {
   const ids = [...new Set((videoIds || []).filter(Boolean))];
   if (!ids.length) {
     const list = await readPending(kv);
-    return { removed: 0, count: list.length };
+    return { removed: 0, skipped: [], count: list.length };
   }
+  // A video with a saved note is completed, not queued: discard must not eat it (issue #5).
+  const processed = await Promise.all(ids.map(async (id) => [id, !!(await kv.get(KV_PROCESSED_PREFIX + id))] as const));
+  const skipped = processed.filter(([, done]) => done).map(([id]) => id);
+  const droppable = ids.filter((id) => !skipped.includes(id));
   const discarded = await readDiscardedIds(kv);
-  for (const id of ids) discarded.add(id);
+  for (const id of droppable) discarded.add(id);
   await writeDiscardedList(kv, discarded);
-  const list = removePendingIds(await readPending(kv), ids);
+  const list = removePendingIds(await readPending(kv), droppable);
   await writePendingList(kv, list);
-  return { removed: ids.length, count: list.length };
+  return { removed: droppable.length, skipped, count: list.length };
 }
 
 export async function patchPending(
@@ -330,3 +336,33 @@ export async function readAnalyses(kv: Kv, date: string): Promise<unknown[]> {
   }
   return notes;
 }
+
+/** Save a note AND complete its inbox item in one store operation.
+ *  "Processed means out of pending" is the Worker's rule (issue #5): both note
+ *  writers (helper Process, Gemini Web import) stop removing pending rows
+ *  themselves. Completion removes the pending row without discarding it —
+ *  re-saves and history notes must not land in the discarded list. Returns how
+ *  many pending rows were actually removed. */
+export async function completeInboxNote(
+  kv: Kv,
+  video: { videoId: string; processedAt?: string }
+): Promise<{ removedFromPending: number }> {
+  const dateKey = video.processedAt?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const removed = await serialize(async () => {
+    const current = await readPending(kv);
+    const hadRow = current.some((v) => v.videoId === video.videoId);
+    if (hadRow) await writePendingList(kv, removePendingIds(current, [video.videoId]));
+    await kv.put(analysisKey(dateKey, video.videoId), JSON.stringify(video), { expirationTtl: NOTE_TTL_SECONDS });
+    await kv.put(KV_PROCESSED_PREFIX + video.videoId, "1");
+    await upsertAnalysisIndex(kv, {
+      videoId: video.videoId,
+      date: dateKey,
+      processedAt: video.processedAt || dateKey,
+    });
+    return hadRow ? 1 : 0;
+  });
+  return { removedFromPending: removed };
+}
+
+/** Notes expire from KV after 30 days, same as before the shared completion. */
+const NOTE_TTL_SECONDS = 60 * 60 * 24 * 30;

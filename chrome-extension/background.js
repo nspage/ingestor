@@ -467,18 +467,14 @@ async function importGeminiNote(request, sender) {
   const url = chatUrl || geminiConversationUrl(pending.geminiChatUrl);
   if (url) processed.geminiChatUrl = url;
 
-  await workerFetch("/api/videos/processed", {
+  // Completion is the Worker's job (issue #5): POST /api/videos/processed also
+  // removes the pending row. No separate pending DELETE from the client.
+  const saved = await workerFetch("/api/videos/processed", {
     method: "POST",
     body: JSON.stringify(processed),
   });
 
-  if (completed) {
-    try {
-      await workerFetch("/api/videos/pending", {
-        method: "DELETE",
-        body: JSON.stringify({ videoIds: [session.videoId] }),
-      });
-    } catch { /* note is saved even if pending delete fails */ }
+  if (saved?.removedFromPending) {
     invalidateKvCache();
     await notifyYoutubeTabs({ type: "QUEUE_UPDATED" });
   }
