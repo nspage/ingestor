@@ -1,46 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="theme-color" content="#101114" />
   <title>ingestor</title>
+  <link rel="preconnect" href="https://img.youtube.com" />
   <link rel="stylesheet" href="sidepanel.css" />
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to Content</a>
   <header class="top">
     <div>
-      <div class="brand">ingestor</div>
+      <h1 class="brand">ingestor</h1>
       <div id="status-line" class="status">
-        <button type="button" id="helper-pill" class="helper-pill off" aria-live="polite" title="Start helper">
+        <button type="button" id="helper-pill" class="helper-pill off" title="Start Helper" aria-label="Start Helper">
           <span class="helper-dot" aria-hidden="true"></span>
           <span id="helper-label">Checking…</span>
         </button>
-        <span id="status-meta"></span>
+        <span id="status-meta" aria-live="polite"></span>
       </div>
     </div>
     <div class="top-actions">
-      <button type="button" id="start-btn" class="ghost hidden">Start helper</button>
-      <button type="button" id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+      <button type="button" id="start-btn" class="ghost">Start Helper</button>
+      <button type="button" id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
     </div>
   </header>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="pending">Pending <span id="pending-count" class="badge">0</span></button>
-    <button class="tab" data-tab="channels">Channels <span id="channels-count" class="badge">0</span></button>
-    <button class="tab" data-tab="history">History <span id="history-count" class="badge">0</span></button>
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button type="button" class="tab active" role="tab" id="tab-pending" data-tab="pending" aria-controls="view-pending" aria-selected="true">Pending <span id="pending-count" class="badge">0</span></button>
+    <button type="button" class="tab" role="tab" id="tab-channels" data-tab="channels" aria-controls="view-channels" aria-selected="false" tabindex="-1">Channels <span id="channels-count" class="badge">0</span></button>
+    <button type="button" class="tab" role="tab" id="tab-history" data-tab="history" aria-controls="view-history" aria-selected="false" tabindex="-1">History <span id="history-count" class="badge">0</span></button>
   </nav>
 
-  <section id="view-pending" class="view active">
+  <main id="main">
+  <section id="view-pending" class="view active" role="tabpanel" aria-labelledby="tab-pending">
     <div class="inbox-row">
       <div id="inbox-meta" class="inbox-meta"></div>
-      <button type="button" id="select-all" class="text-btn">Select all</button>
+      <button type="button" id="select-all" class="text-btn">Select All</button>
     </div>
     <div class="filter-block">
-      <div class="filter-label">Categories</div>
-      <div id="cat-filters" class="filters"></div>
+      <p class="filter-label" id="cat-filters-label">Categories</p>
+      <div id="cat-filters" class="filters" role="group" aria-labelledby="cat-filters-label"></div>
     </div>
     <div class="filter-block">
-      <button type="button" id="toggle-channels" class="filter-toggle">Channels</button>
-      <div id="chan-filters" class="filters hidden"></div>
+      <button type="button" id="toggle-channels" class="filter-toggle" aria-expanded="false" aria-controls="chan-filters">Channels</button>
+      <div id="chan-filters" class="filters hidden" role="group" aria-label="Channels"></div>
     </div>
     <div id="bulk-bar" class="bulk hidden">
       <span id="bulk-label">0 selected</span>
@@ -50,91 +54,115 @@
     </div>
     <div id="needs-cat" class="needs-cat hidden">
       <div class="needs-cat-hd">
-        <span id="needs-cat-label">Needs a category</span>
+        <span id="needs-cat-label">Needs a Category</span>
         <div class="needs-cat-actions">
-          <select id="needs-cat-select"></select>
-          <button type="button" id="needs-cat-apply" class="btn process">Apply to all</button>
+          <label class="sr-only" for="needs-cat-select">Category</label>
+          <select id="needs-cat-select" name="needs-category"></select>
+          <button type="button" id="needs-cat-apply" class="btn process">Apply to All</button>
         </div>
       </div>
       <div id="needs-cat-list" class="list"></div>
     </div>
     <div id="pending-list" class="list"></div>
-    <button type="button" id="show-older" class="text-btn hidden">Show older</button>
+    <button type="button" id="show-older" class="text-btn hidden">Show Older</button>
   </section>
 
-  <section id="view-channels" class="view">
+  <section id="view-channels" class="view" role="tabpanel" aria-labelledby="tab-channels" hidden>
     <div class="add-row">
-      <input id="channel-url" type="text" placeholder="YouTube channel URL" />
-      <select id="channel-cat"></select>
+      <label class="sr-only" for="channel-url">YouTube Channel URL</label>
+      <input id="channel-url" name="channel-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.youtube.com/@handle…" />
+      <label class="sr-only" for="channel-cat">Category</label>
+      <select id="channel-cat" name="channel-cat"></select>
       <button type="button" id="track-btn" class="btn process">Track</button>
     </div>
     <div id="channels-list" class="list"></div>
   </section>
 
-  <section id="view-history" class="view">
+  <section id="view-history" class="view" role="tabpanel" aria-labelledby="tab-history" hidden>
     <div class="inbox-row">
-      <input id="history-search" class="search" type="search" placeholder="Search title or channel" />
+      <label class="sr-only" for="history-search">Search History</label>
+      <input id="history-search" name="history-search" class="search" type="search" placeholder="Search title or channel…" />
       <div class="inbox-actions">
-        <button type="button" id="history-select-all" class="text-btn">Select all</button>
-        <button type="button" id="history-export-notes" class="text-btn">Export notes</button>
-        <button type="button" id="history-export-transcripts" class="text-btn">Export transcripts</button>
+        <button type="button" id="history-select-all" class="text-btn">Select All</button>
+        <button type="button" id="history-export-notes" class="text-btn">Export Notes</button>
+        <button type="button" id="history-export-transcripts" class="text-btn">Export Transcripts</button>
       </div>
     </div>
     <div id="history-cat-block" class="filter-block hidden">
-      <div class="filter-label">Categories</div>
-      <div id="history-cat-filters" class="filters"></div>
+      <p class="filter-label" id="history-cat-filters-label">Categories</p>
+      <div id="history-cat-filters" class="filters" role="group" aria-labelledby="history-cat-filters-label"></div>
     </div>
     <div class="filter-block">
-      <div class="filter-label">Source</div>
-      <div id="history-source-filters" class="filters"></div>
+      <p class="filter-label" id="history-source-filters-label">Source</p>
+      <div id="history-source-filters" class="filters" role="group" aria-labelledby="history-source-filters-label"></div>
     </div>
     <div class="filter-block">
-      <div class="filter-label">Description</div>
-      <div id="history-desc-filters" class="filters"></div>
+      <p class="filter-label" id="history-desc-filters-label">Description</p>
+      <div id="history-desc-filters" class="filters" role="group" aria-labelledby="history-desc-filters-label"></div>
     </div>
     <div id="history-bulk" class="bulk hidden">
       <span id="history-bulk-label">0 selected</span>
-      <button type="button" id="history-open" class="text-btn">Open videos</button>
+      <button type="button" id="history-open" class="text-btn">Open Videos</button>
       <button type="button" id="history-delete" class="btn discard">Delete</button>
     </div>
     <div id="failed-list" class="list"></div>
     <div id="history-list" class="list"></div>
   </section>
 
-  <section id="view-settings" class="view">
+  <section id="view-settings" class="view" hidden>
+    <h2>API Keys</h2>
+    <p class="settings-help">Process bills your OpenRouter account. Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">openrouter.ai/keys</a>, paste it here, and Save. The helper stores it on this Mac — not in the cloud.</p>
+    <p id="keys-status" class="settings-help"></p>
+    <div class="add-row keys-row">
+      <label class="sr-only" for="or-key">OpenRouter Key</label>
+      <input id="or-key" name="openrouter-key" type="password" autocomplete="off" spellcheck="false" placeholder="OpenRouter key (sk-or-…)" />
+      <button type="button" id="save-or-key" class="btn process">Save Key</button>
+    </div>
+    <details class="keys-more">
+      <summary>Optional YouTube Data API Key</summary>
+      <p class="settings-help">Improves titles and durations. Channel names work without it.</p>
+      <div class="add-row keys-row">
+        <label class="sr-only" for="yt-key">YouTube Data API Key</label>
+        <input id="yt-key" name="youtube-key" type="password" autocomplete="off" spellcheck="false" placeholder="YouTube Data API key…" />
+        <button type="button" id="save-yt-key" class="btn process">Save</button>
+      </div>
+    </details>
     <label class="setting-row" for="send-tg">
       <span>Send finished notes to Telegram</span>
-      <input type="checkbox" id="send-tg" />
+      <input type="checkbox" id="send-tg" name="send-telegram" />
     </label>
-    <h3>Categorisation prompt</h3>
-    <textarea id="sys-prompt" rows="6"></textarea>
-    <select id="sys-model"></select>
-    <button type="button" id="save-prompt" class="btn process">Save prompt</button>
-    <h3>Categories</h3>
+    <h2>Categorisation Prompt</h2>
+    <label class="sr-only" for="sys-prompt">Categorisation Prompt</label>
+    <textarea id="sys-prompt" name="categorisation-prompt" rows="6"></textarea>
+    <label class="sr-only" for="sys-model">Categorisation Model</label>
+    <select id="sys-model" name="categorisation-model"></select>
+    <button type="button" id="save-prompt" class="btn process">Save Prompt</button>
+    <h2>Categories</h2>
     <div class="add-row">
-      <input id="new-cat-name" type="text" placeholder="New category" />
+      <label class="sr-only" for="new-cat-name">New Category</label>
+      <input id="new-cat-name" name="new-category" type="text" placeholder="New category…" />
       <button type="button" id="add-cat" class="btn process">Add</button>
     </div>
     <div id="settings-cats" class="list"></div>
   </section>
 
-  <section id="view-note" class="view note-view">
+  <section id="view-note" class="view note-view" hidden>
     <div id="note-scroll" class="note-scroll">
       <button type="button" id="note-back" class="text-btn">← History</button>
-      <h1 id="note-title" class="note-title"></h1>
+      <h2 id="note-title" class="note-title"></h2>
       <nav id="branch-nav" class="branch-nav hidden"></nav>
       <div id="note-meta" class="meta"></div>
       <div class="row-actions note-toolbar">
-        <div class="doc-mode" role="tablist">
-          <button type="button" id="doc-note" class="doc-mode-btn on" role="tab">Note</button>
-          <button type="button" id="doc-transcript" class="doc-mode-btn" role="tab">Transcript</button>
+        <div class="doc-mode" role="tablist" aria-label="Document Mode">
+          <button type="button" id="doc-note" class="doc-mode-btn on" role="tab" aria-selected="true">Note</button>
+          <button type="button" id="doc-transcript" class="doc-mode-btn" role="tab" aria-selected="false">Transcript</button>
         </div>
         <label id="ts-toggle" class="ts-toggle hidden">
           <input type="checkbox" id="show-ts" />
           Timestamps
         </label>
-        <button type="button" id="note-copy" class="btn discard">Copy markdown</button>
-        <button type="button" id="note-video" class="text-btn">Open video</button>
+        <button type="button" id="note-copy" class="btn discard">Copy Markdown</button>
+        <a id="note-video" class="text-btn" target="_blank" rel="noreferrer">Open Video</a>
       </div>
       <section id="desc-draft" class="desc-draft hidden">
         <div class="desc-draft-hd">
@@ -144,10 +172,11 @@
             <button type="button" id="desc-preview" class="doc-mode-btn">Preview</button>
           </div>
         </div>
-        <textarea id="desc-editor" rows="8"></textarea>
+        <label class="sr-only" for="desc-editor">Description</label>
+        <textarea id="desc-editor" name="description" rows="8"></textarea>
         <article id="desc-preview-body" class="md hidden"></article>
         <div class="row-actions">
-          <button type="button" id="desc-add" class="btn process">Add to note</button>
+          <button type="button" id="desc-add" class="btn process">Add to Note</button>
           <button type="button" id="desc-dismiss" class="btn discard">Dismiss</button>
         </div>
       </section>
@@ -163,20 +192,19 @@
       <article id="note-body" class="md"></article>
     </div>
     <footer id="note-composer" class="note-composer hidden">
-      <!-- Follow-up mode (default) -->
       <div id="composer-followup">
         <div class="composer-hd">
-          <span>Follow up</span>
-          <button type="button" id="composer-tall" class="text-btn">Half height</button>
+          <span>Follow Up</span>
+          <button type="button" id="composer-tall" class="text-btn">Half Height</button>
         </div>
-        <textarea id="composer-input" rows="3" placeholder="Write a follow-up. Click copies. Option-click inserts."></textarea>
+        <label class="sr-only" for="composer-input">Follow-Up</label>
+        <textarea id="composer-input" name="follow-up" rows="3" placeholder="Write a follow-up. Click copies. Option-click inserts…"></textarea>
         <div class="composer-actions">
           <button type="button" id="composer-send" class="btn process">Send</button>
           <button type="button" id="composer-branch-toggle" class="btn branch">Branch</button>
         </div>
       </div>
 
-      <!-- Branch mode -->
       <div id="composer-branch" class="hidden">
         <div class="composer-hd branch-hd">
           <span>Branch · <span id="branch-count">0</span>/3</span>
@@ -187,14 +215,16 @@
         </div>
         <div id="branch-list" class="branch-list"></div>
         <div class="composer-actions">
-          <button type="button" id="branch-send" class="btn branch">Send all</button>
+          <button type="button" id="branch-send" class="btn branch">Send All</button>
         </div>
-        <div id="branch-progress" class="branch-progress hidden"></div>
+        <div id="branch-progress" class="branch-progress hidden" role="status" aria-live="polite"></div>
       </div>
     </footer>
   </section>
+  </main>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <script src="helper-connect.js"></script>
   <script type="module" src="sidepanel.js"></script>
 </body>
 </html>

@@ -31,7 +31,9 @@ chrome.runtime.onConnect.addListener((port) => {
 
 async function helperUp() {
   try {
-    const res = await fetch(`${LOCAL}/health`);
+    const opts = { signal: AbortSignal.timeout(2000) };
+    try { opts.targetAddressSpace = "loopback"; } catch { /* older chrome */ }
+    const res = await fetch(`${LOCAL}/health`, opts);
     const data = await res.json();
     return !!(data && data.ok);
   } catch {
@@ -49,23 +51,7 @@ async function bootstrap() {
   } catch { /* off */ }
 }
 
-async function postJson(url, body) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json().catch(() => ({}));
-  return { ok: res.ok, status: res.status, data };
-}
-
 async function queueVideosLocal(videos) {
-  const batched = await postJson(`${LOCAL}/queue`, { videos });
-  if (batched.ok) return { success: true, ...batched.data };
-  if (batched.status !== 404) {
-    return { success: false, error: batched.data.error || `local ${batched.status}` };
-  }
-
   const results = [];
   for (const video of videos) {
     if (!video?.videoId) {
@@ -78,13 +64,9 @@ async function queueVideosLocal(videos) {
         body: JSON.stringify(video),
       });
       results.push({ videoId: video.videoId, status: "queued" });
-      continue;
-    } catch {
-      /* fall through to helper restore */
+    } catch (e) {
+      results.push({ videoId: video.videoId, status: "error", error: String(e.message || e) });
     }
-    const one = await postJson(`${LOCAL}/queue/restore`, video);
-    if (one.ok) results.push({ videoId: video.videoId, status: "queued" });
-    else results.push({ videoId: video.videoId, status: "error", error: one.data.error || `local ${one.status}` });
   }
   const queued = results.filter((r) => r.status === "queued").length;
   return {
@@ -141,20 +123,7 @@ async function loadPageContextData() {
     pending = await workerFetch("/api/videos/pending");
     categories = await workerFetch("/api/categories");
   } catch {
-    try {
-      const fetchJson = async (url) => {
-        const r = await fetch(url);
-        return r.json();
-      };
-      const [c, p, k] = await Promise.all([
-        fetchJson(`${LOCAL}/channels`),
-        fetchJson(`${LOCAL}/queue`),
-        fetchJson(`${LOCAL}/categories`),
-      ]);
-      channels = c.channels || [];
-      pending = p.queue || [];
-      categories = k.categories || [];
-    } catch { /* empty */ }
+    /* Worker creds missing or down — YouTube page gets an empty context */
   }
   const names = (categories || []).map((c) => c.name || c).filter(Boolean);
   if (names.length) await chrome.storage.local.set({ cachedCategories: names });
@@ -236,33 +205,12 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return;
   }
 
-  if (request.type === "PROCESS_VIDEO") {
-    (async () => {
-      try {
-        const on = await helperUp();
-        if (!on) {
-          sendResponse({ success: false, error: "Helper is off. Open the extension and click Start helper." });
-          return;
-        }
-        const res = await fetch(`${LOCAL}/process`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ videos: [request.payload] }),
-        });
-        sendResponse(await res.json());
-      } catch (err) {
-        sendResponse({ success: false, error: err.message });
-      }
-    })();
-    return true;
-  }
-
   if (request.type === "QUEUE_VIDEOS") {
     (async () => {
       try {
         const on = await helperUp();
         if (!on) {
-          sendResponse({ success: false, error: "Helper is off. Open the extension and click Start helper." });
+          sendResponse({ success: false, error: "Helper is off. Open the extension and click Start Helper." });
           return;
         }
         await bootstrap();

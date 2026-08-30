@@ -3,16 +3,20 @@ import { test } from "node:test";
 import {
   applyPatches,
   canonicalChannelId,
+  categoryAllowsShorts,
   displayChannelName,
   findTrackedChannel,
   isPlaceholderChannelName,
   mergePending,
+  MIN_PENDING_SECONDS,
   normalizeChannels,
   removePendingIds,
   removeTrackedIds,
   shouldIngestChannel,
+  SHORT_TEXT_CATEGORY,
   upsertPending,
 } from "../src/queue";
+import { parseFeedEntries } from "../src/ingest";
 
 test("mergePending drops discarded ids even if a stale list still has them", () => {
   const stale = [
@@ -124,4 +128,50 @@ test("removeTrackedIds removes only the exact KV id", () => {
 test("canonicalChannelId does not rewrite ids from a hardcoded alias map", () => {
   assert.equal(canonicalChannelId("UC2ojq_nuP8ceeHqiroeKhBA"), "UC2ojq_nuP8ceeHqiroeKhBA");
   assert.equal(canonicalChannelId("  UCkeep  "), "UCkeep");
+});
+
+test("categoryAllowsShorts is true for short text extract and on_screen_text visual", () => {
+  assert.equal(categoryAllowsShorts("short text extract"), true);
+  assert.equal(categoryAllowsShorts("Tactical"), false);
+  assert.equal(MIN_PENDING_SECONDS, 180);
+  assert.equal(SHORT_TEXT_CATEGORY, "short text extract");
+  assert.equal(
+    categoryAllowsShorts("Tactical", [{
+      name: "Tactical",
+      visualAssets: { enabled: true, kinds: ["on_screen_text"] },
+    }]),
+    true
+  );
+  assert.equal(
+    categoryAllowsShorts("Tactical", [{
+      name: "Tactical",
+      visualAssets: { enabled: true, kinds: ["ui", "code"] },
+    }]),
+    false
+  );
+});
+
+test("parseFeedEntries reads every Atom entry", () => {
+  const xml = `<?xml version="1.0"?>
+  <feed>
+    <entry>
+      <yt:videoId>aaa111</yt:videoId>
+      <yt:channelId>UCabc</yt:channelId>
+      <title>First</title>
+      <published>2026-08-29T10:00:00+00:00</published>
+      <author><name>Build in Public</name></author>
+    </entry>
+    <entry>
+      <yt:videoId>bbb222</yt:videoId>
+      <yt:channelId>UCabc</yt:channelId>
+      <title>Second</title>
+      <published>2026-08-29T12:00:00+00:00</published>
+      <author><name>Build in Public</name></author>
+    </entry>
+  </feed>`;
+  const entries = parseFeedEntries(xml);
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0].videoId, "aaa111");
+  assert.equal(entries[1].videoId, "bbb222");
+  assert.equal(entries[0].channelName, "Build in Public");
 });

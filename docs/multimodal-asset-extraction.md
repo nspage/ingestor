@@ -1,6 +1,6 @@
 # Multimodal asset extraction for category-specific videos
 
-**Status:** parked, not scheduled. Do not implement.
+**Status:** partially implemented (2026-08-29): slices 1–3 + eval tooling are live — `visualAssets` per category (Worker + KV + extension settings), locate pass in `process-video.ts`, asset strip in notes, `scripts/visual-eval.ts`. **Not done:** slice 0 eval (run it before enabling categories), slice 4 stills, slice 5 landing-page work.
 
 Written 2026-08-28. Reopen by starting at [Eval before product UI](#0-eval-before-product-ui-1-2-days).
 
@@ -35,10 +35,10 @@ They cannot:
 
 So “extract assets” is two jobs:
 
-1. **Locate** — Gemini finds interesting frames and describes them
+1. **Locate + reconstruct** — Gemini finds unique on-screen objects and rebuilds them as markdown
 2. **Materialize** (optional) — local `yt-dlp` + `ffmpeg` actually cut stills
 
-Skipping (2) still produces a useful product: an **asset index** inside the note (caption + timestamp that seeks YouTube). Doing (2) is the real extraction pipeline and is a larger, legally sharper step.
+Skipping (2) still produces a useful product: a **reconstruction pass** inside the note — unique on-screen objects (slides, diagrams, UI, code, charts) rebuilt as markdown tables/lists/code with a timestamp link for audit. Doing (2) is the real extraction pipeline and is a larger, legally sharper step.
 
 Do not confuse this with **Gemini Omni Flash** (`gemini-omni-1.1-flash`). That generates/edits video. Wrong model family.
 
@@ -63,13 +63,13 @@ Gemini Web already exists as a **human** visual path (open the video in gemini.g
 
 ### Job to be done
 
-For videos where the value is **on screen, not just spoken** (tutorials, slide talks, tool walkthroughs, framework diagrams), the note should keep those frames as first-class objects: caption, timestamp, type, and optionally a still.
+For videos where the value is **on screen, not just spoken** (tutorials, slide talks, tool walkthroughs, framework diagrams), the note should keep those objects as first-class knowledge: a markdown **reconstruction** of each unique on-screen object (table, field list, code block, diagram map) plus a timestamp link so a human can audit it against the video. The timestamp is a footnote, not the product.
 
 Talking-head / podcast / news-roundup videos should stay on the cheap transcript path. Running video tokens on every Process would be wasteful and noisy.
 
 ### What counts as an asset
 
-Keep a closed type list. The model must skip talking heads, b-roll, and intro/outro cards.
+The unit of work is a **unique visual object**, not a frame. A slide or diagram that stays on screen while the speaker zooms, pans, highlights, or talks over it is ONE asset — the model watches the whole sequence and reconstructs the FULL object (every labeled region, node, row, field), not the zoomed subset. Keep a closed type list. The model must skip talking heads, b-roll, intro/outro cards, and lower thirds, and keep an object only if the reconstruction adds structure the transcript note would not already have.
 
 | Type | Typical source category | Why keep it |
 |---|---|---|
@@ -79,8 +79,9 @@ Keep a closed type list. The model must skip talking heads, b-roll, and intro/ou
 | `code` | Tactical | IDE / terminal / config that the SOP refers to |
 | `chart` | News/Roundup, Strategy | Stats, market charts |
 | `product` | News, Ideation | Device / UI of a thing being reviewed |
+| `on_screen_text` | **short text extract** | Scrolling Shorts that show a prompt, email, tweet, or notes. Reconstruct the full document from the scroll. |
 
-Hard cap per video (recommended: **12**). Prefer fewer high-signal frames over a storyboard.
+Hard cap per video: **8 unique objects**, strongest first. Zero is a success. Prefer one complete diagram over eight fragments.
 
 ### Category policy (opt-in, not global)
 
@@ -105,6 +106,7 @@ Recommended defaults for the prompts in `categories.json`:
 | **second brain** | Yes | ui | The whole point is the tool surface. |
 | **Ideation** | Optional | slide, product | Whiteboards / competitor shots; more false positives. |
 | **News/Roundup** | No (v1) | — | Mostly talking head + lower-third; skip unless a later eval says otherwise. |
+| **short text extract** | Yes (ships on) | on_screen_text | Scrolling Shorts with a prompt or block of text. Visual-first; captions optional. |
 
 Process stays one click. If the category has `visualAssets.enabled`, the helper runs a second pass after (or instead of merging into) the transcript analysis. Pending cards can show a small “visual” chip so the extra cost is visible before you hit Process.
 
@@ -112,13 +114,12 @@ Process stays one click. If the category has `visualAssets.enabled`, the helper 
 
 In History, below the markdown:
 
-- **Asset strip**: 12 thumbs max, type pill, timestamp, one-line caption
+- **Asset strip**: compact index only — type pill, timestamp, title, max 8; no OCR/caption dump. The reconstruction itself lives in the note markdown.
 - Click timestamp → open YouTube at that time (`&t=125s`)
-- If stills exist, render them inline in the markdown under a `## Visual assets` heading
-- **Appendix format (v1):** one markdown line per asset — `- [12:04](https://www.youtube.com/watch?v=VIDEO_ID&t=724s) — **ui**: Stripe webhook settings — why`. Full YouTube links so the daily email and Telegram doc render correctly; no relative image refs until v2 has an email/R2 story.
-- Export: include image files next to the `.md` when materialize is on; otherwise export the timestamp list
+- **Appendix format (v1):** one `## On screen` heading, then one `### {title}` subsection per object: `[05:08](https://www.youtube.com/watch?v=VIDEO_ID&t=308s) · chart`, followed by the reconstruction as **raw markdown** (a real table, bullet hierarchy, code block, or diagram map — never a prose summary, never quoted/inline-coded, never flattened to one line). Full YouTube links so the daily email and Telegram doc render correctly; no relative image refs until v2 has an email/R2 story.
+- Export: include image files next to the `.md` when materialize is on; otherwise export the appendix markdown
 
-Empty state: “No extractable frames” is a success, not a failure.
+Empty state: “No reconstructable on-screen objects” is a success, not a failure.
 
 ### What not to build in v1
 
@@ -141,7 +142,7 @@ Empty state: “No extractable frames” is a success, not a failure.
 
 Settings for the visual pass:
 
-- `thinkingLevel`: `low` or `medium` (high burns output tokens on a localization task)
+- `thinkingLevel`: `low` or `medium` (medium only if eval shows missed reconstructions; high burns output tokens on a watch-and-transcribe task)
 - `responseMimeType`: `application/json` + a strict schema
 - Default video sampling: **1 fps** (Gemini default). Raise fps only if eval shows missed slide cuts.
 - `mediaResolution`:
@@ -188,18 +189,18 @@ Keep the local-first rule: the helper on the machine talks to Gemini. The Worker
 ```
 Process (category.visualAssets.enabled)
   1. Existing transcript pass → markdown  (lite model)
-  2. Visual locate pass
+  2. Visual locate + reconstruct pass
        contents: [ { file_data: youtubeUrl },
                    { text: category visual prompt + transcript } ]
        model: gemini-3.7-flash
-       structured JSON → assets[]
-  3. Merge assets into ProcessedVideo + append ## Visual assets to analysis
+       structured JSON → assets[] (unique objects, markdown reconstructions)
+  3. Merge assets into ProcessedVideo + append ## On screen to analysis
   4. Optional materialize: yt-dlp → ffmpeg -ss <t> -frames:v 1 → PNG
-       store files on disk; KV holds { ts, type, caption, path }
-  5. Side panel renders strip + inline images (file:// or helper-served)
+       store files on disk; KV holds { ts, type, title, path }
+  5. Side panel renders compact strip; appendix markdown renders inline
 ```
 
-The locate pass gets the transcript as a second text part alongside the video. Without it the model has not seen the SOP and cannot write `why` claims like "the exact checkbox the SOP depends on" — the example below would be a guess. Transcript text is cheap (~1k tok/min) and lets the pass rank frames by what the speaker actually explains, not just what looks structured. Prompt rule: `why` must cite what the transcript says about the frame.
+The locate pass gets the transcript as a second text part alongside the video — so it avoids duplicating spoken content and can name objects the speaker names. It is explicitly NOT there so the model can write narration captions: the reconstruction must add structure (a table, field list, code block, slide hierarchy, diagram map) the transcript does not have.
 
 ### Suggested JSON schema (locate pass)
 
@@ -207,18 +208,19 @@ The locate pass gets the transcript as a second text part alongside the video. W
 {
   "assets": [
     {
-      "t": "12:04",
-      "type": "ui",
-      "title": "Stripe webhook settings",
-      "why": "Shows the exact checkbox the SOP depends on",
-      "ocr": "Listen to events: invoice.paid",
+      "t": "05:08",
+      "tEnd": "07:42",
+      "type": "chart",
+      "title": "NanoClaw vs OpenClaw",
+      "reconstruction": "| | NanoClaw | OpenClaw |\n|---|---|---|\n| Runtime TS lines | ~29,300 | 434,453 |\n| Direct runtime deps | 12 | 70 |",
+      "completeness": "full",
       "confidence": 0.86
     }
   ]
 }
 ```
 
-Prompt rules: skip faces-only frames; skip duplicates within 3s; max 12; require `why` so junk has nowhere to hide.
+Prompt rules: identity is semantic (same object under camera motion), not temporal — zoom/pan on the same slide is ONE asset; reconstruct from the whole sequence; type-specific markdown; drop anything whose reconstruction would restate the transcript in prose; max 8; zero is a success. A per-asset 4000-char cap guards against runaway output.
 
 ### Storage
 
@@ -265,7 +267,7 @@ Also confirm YouTube URL works on the actual channels you track (age-gated, memb
 
 ### Downstream surfaces
 
-The `## Visual assets` appendix flows into every existing renderer of `analysis` uninvited:
+The `## On screen` appendix flows into every existing renderer of `analysis` uninvited:
 
 - **Daily email** (`daily-email.ts` runs the markdown through `marked`) and **Telegram doc** render it as-is. Timestamp *links* render fine in both; relative image paths render broken.
 - So in v1 the appendix uses full `https://www.youtube.com/watch?v=…&t=125s` markdown links, never relative image refs. Side panel may upgrade to stills later; email/Telegram keep working for free.
@@ -290,7 +292,7 @@ The `## Visual assets` appendix flows into every existing renderer of `analysis`
 - Operator guide: when to enable, cost table, public-only limit
 - Landing page: do **not** advertise this until it ships; current brief is transcript-first
 
-**Ballpark to a usable v1 (index, no stills):** ~4–6 engineering days after a successful eval.
+**Ballpark to a usable v1 (reconstruction, no stills):** ~4–6 engineering days after a successful eval.
 **v2 stills:** another ~3 days plus ToS/product review.
 
 ---
@@ -303,8 +305,9 @@ The `## Visual assets` appendix flows into every existing renderer of `analysis`
 | Public-only | Skip visual pass; don’t fail Process |
 | 1 fps misses rapid slide decks | Eval; optional fps 2 on Tactical only |
 | HIGH resolution 4× token cost | HIGH only for kinds that need OCR |
-| Talking-head false positives | Closed type list + `why` + cap 12 + eval |
-| Copyright / ToS on downloaded frames | v1 index-only; v2 personal-use, local, no share |
+| Talking-head false positives | Closed type list + reconstruction-additive rule + cap 8 + eval |
+| Markdown reconstructions + thinking exhaust the output budget | 32k output cap; MAX_TOKENS salvage parses complete assets instead of discarding the pass |
+| Copyright / ToS on downloaded frames | v1 reconstruction-only; v2 personal-use, local, no share |
 | KV size if someone base64s images | Never store binaries in KV |
 | Helper runtime: video calls take 30–90s | Progress text in the panel; don’t block the queue UI |
 
@@ -313,7 +316,7 @@ The `## Visual assets` appendix flows into every existing renderer of `analysis`
 ## Recommended sequence
 
 1. **Eval** 3.7 Flash on real Tactical + Strategy videos (YouTube URL, structured JSON, HIGH vs default).
-2. If precision is good, ship **v1: locate + index** for Tactical / Strategy / second brain. Transcript pass unchanged.
+2. If precision is good, ship **v1: locate + reconstruct** for Tactical / Strategy / second brain. Transcript pass unchanged.
 3. Use it for a week. If you actually click the timestamps, then build **v2 stills**.
 4. Do not enable News/Roundup until eval says it isn’t noise.
 
@@ -321,6 +324,6 @@ The `## Visual assets` appendix flows into every existing renderer of `analysis`
 
 ## Open questions (resolve when reopening)
 
-1. **v1 = timestamp index, or stills on day one?** Index is the honest Gemini capability and avoids YouTube download. Stills are the “extracted assets” people imagine.
+1. **v1 = markdown reconstruction, or stills on day one?** Reconstruction is the honest Gemini capability (it can watch but not return image bytes) and avoids YouTube download. Stills are the “extracted assets” people imagine.
 2. **Which categories to turn on first** — recommendation is Tactical + Strategy + second brain.
 3. **Replace vs augment transcript analysis?** Recommendation: augment. Video is for frames; speech is for SOPs and mental models.

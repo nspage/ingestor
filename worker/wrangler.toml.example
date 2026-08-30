@@ -10,8 +10,13 @@ id = "YOUR_KV_NAMESPACE_ID"
 
 # Set secrets with `npx wrangler secret put NAME` (do not put them here):
 #   WORKER_API_SECRET
-#   GOOGLE_API_KEY          (optional)
+#   GOOGLE_API_KEY          (optional — YouTube metadata)
 #   TELEGRAM_BOT_TOKEN      (optional)
 #   TELEGRAM_CHAT_ID        (optional)
-#   TRIGGER_SECRET_KEY      (optional)
-#   TRIGGER_API_URL         (optional)
+# Optional var so the 30-min cron can renew PubSub leases:
+#   PUBSUB_CALLBACK_URL = "https://YOUR_WORKER/youtube/pubsub"
+# Model keys (OpenRouter / Gemini) stay on the helper (Settings or .env), not on the worker.
+
+# RSS backfill + PubSub lease renewal for tracked channels
+[triggers]
+crons = ["*/30 * * * *"]

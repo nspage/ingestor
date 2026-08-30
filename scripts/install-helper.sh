@@ -9,7 +9,7 @@ HOST_NAME="com.nspage.ytpipeline"
 HOST_SCRIPT="$ROOT/scripts/native-host.sh"
 EXT_ID="ohmmfomloggnnjcfdfmgjloefbfnmoih"
 
-chmod +x "$HOST_SCRIPT" "$ROOT/scripts/native-host.py" "$ROOT/scripts/start-server.sh" "$ROOT/scripts/install-app.sh"
+chmod +x "$HOST_SCRIPT" "$ROOT/scripts/native-host.py" "$ROOT/scripts/start-server.sh" "$ROOT/scripts/restart-helper.sh" "$ROOT/scripts/install-app.sh"
 
 MANIFEST=$(cat <<EOF
 {

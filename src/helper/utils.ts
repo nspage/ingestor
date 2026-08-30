@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 config({ override: true });
-import { Resend } from 'resend';
 import { YoutubeTranscript } from 'youtube-transcript';
 
 // ──────────────────────────────────────────────
@@ -51,41 +50,6 @@ export async function sendTelegramDocument(
 }
 
 // ──────────────────────────────────────────────
-// Email Utilities (Resend)
-// ──────────────────────────────────────────────
-
-/**
- * Send an HTML email via Resend.
- */
-export async function sendEmail(opts: {
-  to: string | string[];
-  subject: string;
-  html: string;
-}): Promise<{ ok: boolean; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    return { ok: false, error: "RESEND_API_KEY missing in .env" };
-  }
-
-  const resend = new Resend(apiKey);
-  const recipients = Array.isArray(opts.to) ? opts.to : [opts.to];
-
-  try {
-    await resend.emails.send({
-      from: 'YT Pipeline <onboarding@resend.dev>',
-      to: recipients,
-      subject: opts.subject,
-      html: opts.html,
-    });
-    return { ok: true };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("Resend error:", error);
-    return { ok: false, error: message };
-  }
-}
-
-// ──────────────────────────────────────────────
 // YouTube Utilities
 // ──────────────────────────────────────────────
 
@@ -105,6 +69,31 @@ export function isPlaceholderChannelName(name: string | undefined | null): boole
   const lower = trimmed.toLowerCase();
   if (["unknown", "unknown channel", "visit source", "youtube video feed", "youtube", "untitled"].includes(lower)) return true;
   return /^channel-\d+$/i.test(trimmed);
+}
+
+export type VideoIdentity = {
+  videoId: string;
+  title?: string;
+  channelName?: string;
+  authorUrl?: string;
+};
+
+/** Title + channel from YouTube oEmbed — no Data API key. Works for Shorts. */
+export async function resolveVideoIdentity(videoId: string): Promise<VideoIdentity | null> {
+  const id = String(videoId || "").trim();
+  if (!id) return null;
+  try {
+    const url = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const title = usableName(data.title) || (typeof data.title === "string" ? data.title.trim() : undefined);
+    const channelName = usableName(data.author_name) || undefined;
+    const authorUrl = typeof data.author_url === "string" ? data.author_url : undefined;
+    return { videoId: id, title, channelName, authorUrl };
+  } catch {
+    return null;
+  }
 }
 
 function extractChannelIdFromUrl(url: string): string | null {

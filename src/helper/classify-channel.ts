@@ -1,37 +1,9 @@
 import { config } from "dotenv";
 config({ override: true });
-import { getLatestVideoIds, getTranscriptSample } from "../utils";
+import { getLatestVideoIds, getTranscriptSample } from "./utils";
 import { GEMINI_MODEL } from "./config";
 import { getCategorisationPromptDetails } from "./kv-client";
-
-// ── Gemini API Helper (Copied from process-video.ts for consistency) ──
-
-async function callGemini(prompt: string, model: string = GEMINI_MODEL): Promise<{ text: string, usage: any }> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY missing in .env");
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1024, temperature: 0.1 }, // Lower temperature for classification accuracy
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Gemini API error ${response.status}: ${err}`);
-  }
-
-  const data: any = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Empty response from Gemini");
-  return { text, usage: data.usageMetadata };
-}
+import { completeText } from "./llm-client";
 
 // ── Classification Task ──
 
@@ -63,7 +35,7 @@ export async function classifyChannel(payload: { channelId: string; channelName?
       .map((s, i) => `--- VIDEO ${i + 1} SNIPPET ---\n${s}`)
       .join("\n\n");
 
-    const defaultPromptBase = `You are an expert Content Strategist. Based on the following transcript snippets from a YouTube channel, classify this channel into EXACTLY one of the following five categories.
+    const defaultPromptBase = `You are an expert Content Strategist. Based on the following transcript snippets from a YouTube channel, classify this channel into EXACTLY one of the following six categories.
 
 CATEGORIES:
 1. **Tactical**: Practical "how-to" guides, technical tutorials, software walkthroughs, coding, or step-by-step Standard Operating Procedures (SOPs).
@@ -71,9 +43,10 @@ CATEGORIES:
 3. **Strategy**: High-level frameworks, mental models, macro-economic shifts, philosophical "why" behind business decisions, or long-term industry positioning.
 4. **News/Roundup**: Summaries of current events, industry headlines, weekly updates, or commentary on trending topics.
 5. **second brain**: Personal Knowledge Management (PKM), productivity systems, note-taking methodologies, or "linking your thinking" workflows.
+6. **short text extract**: Shorts and clips where the value is on-screen text (prompts, emails, tweets, notes the OP scrolls through), not spoken explanation.
 
 Instructions:
-- Return ONLY the category name (one of: Tactical, Ideation, Strategy, News/Roundup, second brain).
+- Return ONLY the category name (one of: Tactical, Ideation, Strategy, News/Roundup, second brain, short text extract).
 - If the channel fits multiple categories, pick the most dominant one.`;
 
     let customPrompt = "";
@@ -97,15 +70,19 @@ Instructions:
       prompt = `${basePrompt}\n\nCONTENT SNIPPETS:\n${concatenatedTranscripts}`;
     }
 
-    // 4. Call Gemini
-    console.log(`[Classifier] Calling Gemini (${finalModel}) for classification...`);
-    const { text } = await callGemini(prompt, finalModel);
+    console.log(`[Classifier] Classifying with ${finalModel}...`);
+    const { text } = await completeText({
+      model: finalModel,
+      prompt,
+      maxTokens: 1024,
+      temperature: 0.1,
+    });
     
     // Clean up response (Gemini sometimes adds markdown or whitespace)
     const category = text.trim().replace(/[*_]/g, "");
     
     // Validation: ensure the returned category is one of the allowed ones
-    const validCategories = ["Tactical", "Ideation", "Strategy", "News/Roundup", "second brain"];
+    const validCategories = ["Tactical", "Ideation", "Strategy", "News/Roundup", "second brain", "short text extract"];
     const finalCategory = validCategories.find(c => c.toLowerCase() === category.toLowerCase()) || "Strategy";
 
     console.log(`[Classifier] Result: ${finalCategory}`);

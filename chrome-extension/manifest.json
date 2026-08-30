@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YT LLM Pipeline Assistant",
-  "version": "2.17",
+  "version": "2.20",
   "description": "Review YouTube videos and send them through your local knowledge pipeline.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArUB961Dd0DqtheVuNedjxmDbXT0ur+bwRvvuxa1gpLS4SuQYkYOa5WnDrF7tpusbXCPRngWYx9Tv9sWns7DNT8dQtFmmS4sqeRvjLpJ/dLNDiODsW6mJorO5zVrLYXeykiyLqcgqBp8pN7CCAKl57dq2v4xUROwibA2wEM/DYwotay2kItqhDBU+E+K8UkDMEFPUTUMidJwv7Gpk+POB7W89N5qK+Gd9kX7YUUOOY7cgEv106353opw0CbibV7SyWZD8hfMML6KPZiHWQT76i8n+3hwVgJu6oe21AOqAg9Fd1pTD2eWIpC7lhrhdSADtyD+uXi1my0w2ZB1Jy0N2gwIDAQAB",
   "permissions": [

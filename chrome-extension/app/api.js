@@ -2,19 +2,53 @@ import { getState, setState, keys } from "./state.js";
 
 const LOCAL = "http://127.0.0.1:3000/api/extension";
 
-export async function helperUp() {
+function timeoutSignal(ms) {
   try {
-    const res = await fetch(`${LOCAL}/health`);
-    const data = await res.json();
-    return !!(data && data.ok);
+    return AbortSignal.timeout(ms);
   } catch {
-    return false;
+    const c = new AbortController();
+    setTimeout(() => c.abort(), ms);
+    return c.signal;
   }
+}
+
+function helperFetch(path, init = {}) {
+  const opts = { ...init, signal: init.signal || timeoutSignal(2000) };
+  try { opts.targetAddressSpace = "loopback"; } catch { /* older chrome */ }
+  return fetch(`${LOCAL}${path}`, opts);
+}
+
+export async function helperHealth() {
+  try {
+    const res = await helperFetch("/health");
+    const data = await res.json();
+    if (data && data.ok) return data;
+  } catch {
+    /* helper off or Chrome blocked loopback */
+  }
+  return { ok: false, openrouter: false, gemini: false, youtube: false, llm: false };
+}
+
+export async function helperUp() {
+  const health = await helperHealth();
+  return !!health.ok;
+}
+
+export async function getSecrets() {
+  return localFetch("/secrets");
+}
+
+export async function saveSecrets(payload) {
+  return localFetch("/secrets", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function resolveIdentity(videoId) {
+  return localFetch(`/identity/${encodeURIComponent(videoId)}`);
 }
 
 export async function bootstrap() {
   try {
-    const res = await fetch(`${LOCAL}/bootstrap`);
+    const res = await helperFetch("/bootstrap", { signal: timeoutSignal(4000) });
     const data = await res.json();
     if (data.success && data.workerUrl && data.token) {
       await setState({ [keys().workerUrl]: data.workerUrl, [keys().workerToken]: data.token });
@@ -36,6 +70,7 @@ async function workerFetch(path, init = {}) {
   if (!url || !token) throw new Error("no-creds");
   const res = await fetch(`${url}${path}`, {
     ...init,
+    signal: init.signal || timeoutSignal(12000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
@@ -47,10 +82,13 @@ async function workerFetch(path, init = {}) {
 }
 
 async function localFetch(path, init = {}) {
-  const res = await fetch(`${LOCAL}${path}`, {
+  const opts = {
     ...init,
+    signal: init.signal || timeoutSignal(8000),
     headers: { "Content-Type": "application/json", ...(init.headers || {}) },
-  });
+  };
+  try { opts.targetAddressSpace = "loopback"; } catch { /* older chrome */ }
+  const res = await fetch(`${LOCAL}${path}`, opts);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `local ${res.status}`);
   return data;
@@ -61,33 +99,18 @@ function invalidateContext() {
 }
 
 export async function getQueue() {
-  try {
-    const list = await workerFetch("/api/videos/pending");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/queue");
-    return data.queue || [];
-  }
+  const list = await workerFetch("/api/videos/pending");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getChannels() {
-  try {
-    const list = await workerFetch("/api/channels");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/channels");
-    return data.channels || [];
-  }
+  const list = await workerFetch("/api/channels");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getCategories() {
-  try {
-    const list = await workerFetch("/api/categories");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/categories");
-    return data.categories || [];
-  }
+  const list = await workerFetch("/api/categories");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getDescription(videoId, channelId) {
@@ -127,94 +150,54 @@ export async function unprocessVideo(videoId, processedAt) {
 }
 
 export async function getHistory() {
-  try {
-    const list = await workerFetch("/api/videos/analyses?date=all");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/history");
-    return data.history || [];
-  }
+  const list = await workerFetch("/api/videos/analyses?date=all");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getFailed() {
-  try {
-    const list = await workerFetch("/api/videos/failed");
-    return Array.isArray(list) ? list : [];
-  } catch {
-    const data = await localFetch("/failed");
-    return data.failed || [];
-  }
+  const list = await workerFetch("/api/videos/failed");
+  return Array.isArray(list) ? list : [];
 }
 
 export async function getCost() {
-  try {
-    return await workerFetch("/api/costs/daily");
-  } catch {
-    return localFetch("/cost");
-  }
+  return workerFetch("/api/costs/daily");
 }
 
 export async function isProcessed(videoId) {
-  try {
-    const data = await workerFetch(`/api/videos/processed/${videoId}`);
-    return !!data.exists;
-  } catch {
-    try {
-      const data = await localFetch(`/processed/${videoId}`);
-      return !!data.exists;
-    } catch {
-      return false;
-    }
-  }
+  const data = await workerFetch(`/api/videos/processed/${videoId}`);
+  return !!data.exists;
 }
 
 export async function discardVideos(videoIds) {
-  try {
-    await workerFetch("/api/videos/pending", {
-      method: "DELETE",
-      body: JSON.stringify({ videoIds }),
-    });
-  } catch {
-    for (const videoId of videoIds) {
-      await localFetch("/discard", { method: "POST", body: JSON.stringify({ videoId }) });
-    }
-  }
+  await workerFetch("/api/videos/pending", {
+    method: "DELETE",
+    body: JSON.stringify({ videoIds }),
+  });
   invalidateContext();
 }
 
 export async function restoreVideo(video) {
-  try {
-    await workerFetch("/api/videos/pending", {
-      method: "POST",
-      body: JSON.stringify(video),
-    });
-  } catch {
-    await localFetch("/queue/restore", { method: "POST", body: JSON.stringify(video) });
-  }
+  await workerFetch("/api/videos/pending", {
+    method: "POST",
+    body: JSON.stringify(video),
+  });
   invalidateContext();
 }
 
 export async function queueVideos(videos) {
-  try {
-    const data = await localFetch("/queue", { method: "POST", body: JSON.stringify({ videos }) });
-    invalidateContext();
-    return data;
-  } catch (err) {
-    if (!String(err.message || err).includes("404")) throw err;
-    const results = [];
-    for (const video of videos) {
-      try {
-        await restoreVideo(video);
-        results.push({ videoId: video.videoId, status: "queued" });
-      } catch (e) {
-        results.push({ videoId: video.videoId, status: "error", error: String(e.message || e) });
-      }
+  const results = [];
+  for (const video of videos) {
+    try {
+      await restoreVideo(video);
+      results.push({ videoId: video.videoId, status: "queued" });
+    } catch (e) {
+      results.push({ videoId: video.videoId, status: "error", error: String(e.message || e) });
     }
-    const queued = results.filter((r) => r.status === "queued").length;
-    if (!queued) throw err;
-    invalidateContext();
-    return { success: true, results };
   }
+  const queued = results.filter((r) => r.status === "queued").length;
+  if (!queued) throw new Error(results[0]?.error || "Failed to queue");
+  invalidateContext();
+  return { success: true, results };
 }
 
 function withCategory(video, category) {
@@ -227,16 +210,12 @@ export async function updatePendingCategory(videoId, category) {
 
 export async function updatePendingCategories(videoIds, category) {
   const patches = videoIds.map((videoId) => withCategory({ videoId }, category));
-  try {
-    await workerFetch("/api/videos/pending", { method: "PATCH", body: JSON.stringify({ videos: patches }) });
-  } catch {
-    for (const videoId of videoIds) {
-      await localFetch("/queue/update-category", {
-        method: "POST",
-        body: JSON.stringify({ videoId, category }),
-      });
-    }
-  }
+  await workerFetch("/api/videos/pending", { method: "PATCH", body: JSON.stringify({ videos: patches }) });
+}
+
+export async function patchPending(patches) {
+  if (!patches?.length) return;
+  await workerFetch("/api/videos/pending", { method: "PATCH", body: JSON.stringify({ videos: patches }) });
 }
 
 export async function processVideos(videos, sendToTelegram) {
@@ -255,67 +234,38 @@ export async function addChannel(url, category) {
 }
 
 export async function removeChannel(channelId) {
-  try {
-    await workerFetch("/api/channels", { method: "DELETE", body: JSON.stringify({ channelId }) });
-  } catch {
-    await localFetch("/remove-channel", { method: "POST", body: JSON.stringify({ channelId }) });
-  }
+  await workerFetch("/api/channels", { method: "DELETE", body: JSON.stringify({ channelId }) });
   invalidateContext();
 }
 
 export async function updateChannel(channelId, name, category) {
-  try {
-    const channels = await getChannels();
-    const next = channels.map((ch) => (ch.id === channelId ? { ...ch, name, category } : ch));
-    if (!next.some((ch) => ch.id === channelId)) next.push({ id: channelId, name, category });
-    await workerFetch("/api/channels", { method: "PUT", body: JSON.stringify(next) });
-  } catch {
-    await localFetch("/channels/update", {
-      method: "POST",
-      body: JSON.stringify({ channelId, name, category }),
-    });
-  }
+  const channels = await getChannels();
+  const next = channels.map((ch) => (ch.id === channelId ? { ...ch, name, category } : ch));
+  if (!next.some((ch) => ch.id === channelId)) next.push({ id: channelId, name, category });
+  await workerFetch("/api/channels", { method: "PUT", body: JSON.stringify(next) });
   invalidateContext();
 }
 
-export async function saveCategory(name, prompt, model) {
-  try {
-    await workerFetch("/api/categories", { method: "POST", body: JSON.stringify({ name, prompt, model }) });
-  } catch {
-    await localFetch("/categories", { method: "POST", body: JSON.stringify({ name, prompt, model }) });
-  }
+export async function saveCategory(name, prompt, model, visualAssets) {
+  const body = { name, prompt, model };
+  if (visualAssets) body.visualAssets = visualAssets;
+  await workerFetch("/api/categories", { method: "POST", body: JSON.stringify(body) });
 }
 
 export async function deleteCategory(name) {
-  try {
-    await workerFetch("/api/categories", { method: "DELETE", body: JSON.stringify({ name }) });
-  } catch {
-    await localFetch("/categories/delete", { method: "POST", body: JSON.stringify({ name }) });
-  }
+  await workerFetch("/api/categories", { method: "DELETE", body: JSON.stringify({ name }) });
 }
 
 export async function getCategorisationPrompt() {
-  try {
-    return await workerFetch("/api/categorisation-prompt");
-  } catch {
-    return localFetch("/categorisation-prompt");
-  }
+  return workerFetch("/api/categorisation-prompt");
 }
 
 export async function saveCategorisationPrompt(prompt, model) {
-  try {
-    await workerFetch("/api/categorisation-prompt", { method: "POST", body: JSON.stringify({ prompt, model }) });
-  } catch {
-    await localFetch("/categorisation-prompt", { method: "POST", body: JSON.stringify({ prompt, model }) });
-  }
+  await workerFetch("/api/categorisation-prompt", { method: "POST", body: JSON.stringify({ prompt, model }) });
 }
 
 export async function clearFailed(videoId) {
-  try {
-    await workerFetch("/api/videos/failed", { method: "DELETE", body: JSON.stringify({ videoId }) });
-  } catch {
-    await localFetch("/failed/clear", { method: "POST", body: JSON.stringify({ videoId }) });
-  }
+  await workerFetch("/api/videos/failed", { method: "DELETE", body: JSON.stringify({ videoId }) });
 }
 
 export async function startHelper() {
