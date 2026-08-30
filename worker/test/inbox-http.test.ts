@@ -28,7 +28,6 @@ function env(kv = mockKv()) {
   return {
     YT_KV: kv as unknown as KVNamespace,
     WORKER_API_SECRET: SECRET,
-    TRIGGER_SECRET_KEY: "",
     TELEGRAM_BOT_TOKEN: "",
     TELEGRAM_CHAT_ID: "",
   };

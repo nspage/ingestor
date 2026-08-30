@@ -42,7 +42,6 @@ import {
 
 type Env = {
   YT_KV: KVNamespace;
-  TRIGGER_SECRET_KEY: string;
   WORKER_API_SECRET: string;
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
@@ -584,34 +583,6 @@ async function fetchChannelTitles(ids: string[], apiKey: string): Promise<Map<st
     }
   }
   return titles;
-}
-
-/** Trigger a Trigger.dev task via the API */
-async function triggerTask(env: Env, taskId: string, payload: any) {
-  console.log(`Triggering task ${taskId}...`);
-  
-  // V3 Trigger API URL
-  const url = `https://api.trigger.dev/api/v1/tasks/${taskId}/trigger`;
-  
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.TRIGGER_SECRET_KEY}`,
-    },
-    body: JSON.stringify({ payload }),
-  });
-
-  const responseText = await response.text();
-
-  if (!response.ok) {
-    console.error(`Trigger.dev API error: ${response.status} - ${responseText}`);
-    throw new Error(`Trigger.dev API error: ${response.status}`);
-  }
-
-  const result: any = JSON.parse(responseText);
-  console.log(`Triggered ${taskId} successfully. Run ID: ${result.id}`);
-  return result;
 }
 
 // ── Health check ──
