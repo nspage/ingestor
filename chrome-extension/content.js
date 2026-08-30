@@ -1,5 +1,16 @@
 // Same rules as app/inbox-rules.js — content scripts cannot import that ES module.
 const MIN_PENDING_SECONDS = 180;
+// Same vocabulary as app/categories.js — content scripts cannot import that ES module.
+// worker/test/categories-match.test.ts checks that both copies match the worker.
+const CATEGORY_NAMES = [
+  "Tactical",
+  "Ideation",
+  "Strategy",
+  "News/Roundup",
+  "second brain",
+  "short text extract",
+];
+const DEFAULT_CATEGORY = "Strategy";
 const PLACEHOLDER_CHANNEL_NAMES = [
   "",
   "unknown",
@@ -339,7 +350,7 @@ function watchPayload(category, extras = {}) {
 
 function openSendPanel(ctx, knownChannel) {
   const panel = ensurePanel();
-  const cats = ctx.categories?.length ? ctx.categories : ["Strategy"];
+  const cats = ctx.categories?.length ? ctx.categories : CATEGORY_NAMES;
   const catBox = panel.querySelector("#ytp-cats");
   const badge = panel.querySelector("#ytp-badge");
   const sendBtn = panel.querySelector("#ytp-send");
@@ -450,7 +461,7 @@ function injectChannelButton() {
         btn.textContent = "Already tracked";
         return;
       }
-      const category = ctx.categories?.[0] || "Strategy";
+      const category = ctx.categories?.[0] || DEFAULT_CATEGORY;
       btn.textContent = "Tracking…";
       const res = await sendRuntime({
         type: "ADD_CHANNEL",

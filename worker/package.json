@@ -6,7 +6,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
-    "test": "npx --yes tsx --test test/queue.test.ts test/store.test.ts test/inbox-http.test.ts test/inbox-rules.test.ts"
+    "test": "npx --yes tsx --test test/queue.test.ts test/store.test.ts test/inbox-http.test.ts test/inbox-rules.test.ts test/categories-match.test.ts"
   },
   "dependencies": {
     "hono": "^4.11.3"

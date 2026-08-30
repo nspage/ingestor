@@ -19,6 +19,7 @@ import {
   KV_TRACKED_CHANNELS,
 } from "./store";
 import {
+  DEFAULT_CATEGORIES,
   MIN_PENDING_SECONDS,
   categoryAllowsShorts,
   decodeHtmlEntities,
@@ -80,40 +81,7 @@ const KV_CATEGORIES = "categories";
 const KV_CATEGORISATION_PROMPT = "categorisation_prompt";
 const KV_FAILED = "failed_videos";
 
-const DEFAULT_CATEGORIES = [
-  {
-    name: "growth",
-    model: "gemini-3.1-flash-lite",
-    prompt: `Analyze the transcript and provide:\n- Speaker identification with their roles/affiliations\n- Key topics developed in the transcript\nIdentify and categorize the information within the transcript according to the following archetypes. If a category is not present, skip it:\n1. **Mental Models (The 'Why'):** Philosophical shifts or conceptual lenses used to view the problem. \n2. **Frameworks & Systems (The 'Structure'):** Repeatable processes, 2x2 matrices, or step-by-step methodologies developed by the speaker. \n3. **Tactical Tutorials (The 'How'):** Click-by-click or action-by-action instructions. Provide these as a numbered "SOP" (Standard Operating Procedure).\n4. **Deep Dives (The 'Mechanics'):** High-density technical explanations or granular breakdowns of a specific system \n5. **Interview Insights (The 'Nuance'):** If this is an interview, extract the non-obvious wisdom gained from the back-and-forth, including the speaker's personal "war stories."\n6. **Case Studies (The 'Proof'):** Real-world examples cited. Detail the Challenge, the Intervention, and the Result.\n7. **Heuristics & Red Flags (The 'Shortcuts'):** Rules of thumb, "if-this-then-that" shortcuts, and warning signs to watch out for.\n8. **Contrarian Takes (The 'Alpha'):** Ideas mentioned that go against the "common wisdom" of the industry.\n9. **Resource Stack (The 'Tools'):** A list of all software, books, hardware, or third-party services mentioned as essential.`
-  },
-  {
-    name: "ai concepts",
-    model: "gemini-3.1-flash-lite",
-    prompt: `Analyze the transcript and provide:\n- Speaker identification with their roles/affiliations\n- Key topics developed in the transcript\n- Core frameworks and mental models developed in the transcript (with visual representation instructions if relevant)\n- Case studies with key takeaways\n- Glossary of specialized terms\nIdentify and categorize the information within the transcript according to the following archetypes. If a category is not present, skip it:\n1. **Mental Models (The 'Why'):** Philosophical shifts or conceptual lenses used to view the problem. \n2. **Frameworks & Systems (The 'Structure'):** Repeatable processes, 2x2 matrices, or step-by-step methodologies developed by the speaker. \n3. **Tactical Tutorials (The 'How'):** Click-by-click or action-by-action instructions. Provide these as a numbered "SOP" (Standard Operating Procedure).\n4. **Deep Dives (The 'Mechanics'):** High-density technical explanations or granular breakdowns of a specific system \n5. **Interview Insights (The 'Nuance'):** If this is an interview, extract the non-obvious wisdom gained from the back-and-forth, including the speaker's personal "war stories."\n6. **Case Studies (The 'Proof'):** Real-world examples cited. Detail the Challenge, the Intervention, and the Result.\n7. **Heuristics & Red Flags (The 'Shortcuts'):** Rules of thumb, "if-this-then-that" shortcuts, and warning signs to watch out for.\n8. **Contrarian Takes (The 'Alpha'):** Ideas mentioned that go against the "common wisdom" of the industry.\n9. **Resource Stack (The 'Tools'):** A list of all software, books, hardware, or third-party services mentioned as essential.`
-  },
-  {
-    name: "entrepreneurship",
-    model: "gemini-3.1-flash-lite",
-    prompt: `Analyze the transcript and provide:\n- Speaker identification with their roles/affiliations\n- Key topics developed in the transcript\n- Glossary of specialized terms\nIdentify and categorize the information within the transcript according to the following archetypes. If a category is not present, skip it:\n1. **Mental Models (The 'Why'):** Philosophical shifts or conceptual lenses used to view the problem. \n2. **Frameworks & Systems (The 'Structure'):** Repeatable processes, 2x2 matrices, or step-by-step methodologies developed by the speaker. \n3. **Tactical Tutorials (The 'How'):** Click-by-click or action-by-action instructions. Provide these as a numbered "SOP" (Standard Operating Procedure).\n4. **Deep Dives (The 'Mechanics'):** High-density technical explanations or granular breakdowns of a specific system \n5. **Interview Insights (The 'Nuance'):** If this is an interview, extract the non-obvious wisdom gained from the back-and-forth, including the speaker's personal "war stories."\n6. **Case Studies (The 'Proof'):** Real-world examples cited. Detail the Challenge, the Intervention, and the Result.\n7. **Heuristics & Red Flags (The 'Shortcuts'):** Rules of thumb, "if-this-then-that" shortcuts, and warning signs to watch out for.\n8. **Contrarian Takes (The 'Alpha'):** Ideas mentioned that go against the "common wisdom" of the industry.\n9. **Resource Stack (The 'Tools'):** A list of all software, books, hardware, or third-party services mentioned as essential.`
-  },
-  {
-    name: "web3 business",
-    model: "gemini-3.1-flash-lite",
-    prompt: `Analyze the transcript and provide:\n- Speaker identification with their roles/affiliations\n- Key topics developed in the transcript\n- Glossary of specialized terms\nIdentify and categorize the information within the transcript according to the following archetypes. If a category is not present, skip it:\n1. **Mental Models (The 'Why'):** Philosophical shifts or conceptual lenses used to view the problem. \n2. **Frameworks & Systems (The 'Structure'):** Repeatable processes, 2x2 matrices, or step-by-step methodologies developed by the speaker. \n3. **Tactical Tutorials (The 'How'):** Click-by-click or action-by-action instructions. Provide these as a numbered "SOP" (Standard Operating Procedure).\n4. **Deep Dives (The 'Mechanics'):** High-density technical explanations or granular breakdowns of a specific system \n5. **Interview Insights (The 'Nuance'):** If this is an interview, extract the non-obvious wisdom gained from the back-and-forth, including the speaker's personal "war stories."\n6. **Case Studies (The 'Proof'):** Real-world examples cited. Detail the Challenge, the Intervention, and the Result.\n7. **Heuristics & Red Flags (The 'Shortcuts'):** Rules of thumb, "if-this-then-that" shortcuts, and warning signs to watch out for.\n8. **Contrarian Takes (The 'Alpha'):** Ideas mentioned that go against the "common wisdom" of the industry.\n9. **Resource Stack (The 'Tools'):** A list of all software, books, hardware, or third-party services mentioned as essential.`
-  },
-  {
-    name: "short text extract",
-    model: "google/gemini-3.1-flash-lite",
-    prompt: "Reconstruct every readable on-screen text block from this video in reading order. Prefer the screen over speech. Output markdown a human can paste (prompts, lists, emails, tweets, configs). Skip talking head and UI chrome.",
-    visualAssets: {
-      enabled: true,
-      kinds: ["on_screen_text"],
-      model: "google/gemini-3.7-flash",
-      mediaResolution: "high",
-      materialize: "index",
-    },
-  },
-];
+// Seed defaults (the classifier vocabulary) live in queue.ts next to CATEGORY_VOCABULARY.
 
 function seedCategories(list: any[]): { list: any[]; changed: boolean } {
   const next = Array.isArray(list) ? list.slice() : [];

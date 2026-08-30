@@ -9,6 +9,7 @@ import { getPendingVideos, addTrackedChannel, getAllChannels, updatePendingVideo
 import { processVideos } from '../helper/process-video'
 import { completeText } from '../helper/llm-client'
 import { classifyChannel } from '../helper/classify-channel'
+import { canonicalCategory, DEFAULT_CATEGORISATION_PROMPT } from '../helper/config'
 import { resolveChannelInfo, resolveVideoDuration, getTranscriptSample, fetchTranscriptCues, fetchVideoDescription, isPlaceholderChannelName, resolveVideoIdentity } from '../helper/utils'
 import { subscribeSingleChannel } from '../helper/pubsub-manager'
 import { loadUserSecrets, saveUserSecrets, secretsStatus } from '../helper/secrets'
@@ -232,18 +233,7 @@ app.post('/api/extension/classify-video', async (c) => {
             return c.json({ success: false, error: 'Could not retrieve transcript sample for video' }, 400)
         }
 
-        const defaultPromptBase = `You are an expert Content Strategist. Based on the following transcript snippets from a YouTube channel, classify this channel into EXACTLY one of the following five categories.
-
-CATEGORIES:
-1. **Tactical**: Practical "how-to" guides, technical tutorials, software walkthroughs, coding, or step-by-step Standard Operating Procedures (SOPs).
-2. **Ideation**: Brainstorming new business ideas, identifying market "white space," niche hunting, or exploring consumer trends.
-3. **Strategy**: High-level frameworks, mental models, macro-economic shifts, philosophical "why" behind business decisions, or long-term industry positioning.
-4. **News/Roundup**: Summaries of current events, industry headlines, weekly updates, or commentary on trending topics.
-5. **second brain**: Personal Knowledge Management (PKM), productivity systems, note-taking methodologies, or "linking your thinking" workflows.
-
-Instructions:
-- Return ONLY the category name (one of: Tactical, Ideation, Strategy, News/Roundup, second brain).
-- If the channel fits multiple categories, pick the most dominant one.`;
+        const defaultPromptBase = DEFAULT_CATEGORISATION_PROMPT
 
         let customPrompt = ""
         let customModel = ""
@@ -274,8 +264,7 @@ Instructions:
         })
 
         const category = text.trim().replace(/[*_]/g, "")
-        const validCategories = ["Tactical", "Ideation", "Strategy", "News/Roundup", "second brain"]
-        const finalCategory = validCategories.find(c => c.toLowerCase() === category.toLowerCase()) || "Strategy"
+        const finalCategory = canonicalCategory(category)
 
         return c.json({ success: true, category: finalCategory })
     } catch (e) {

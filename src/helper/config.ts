@@ -46,6 +46,10 @@ export const PUBSUB_LEASE_SECONDS = 432_000;
 export {
   MIN_PENDING_SECONDS,
   SHORT_TEXT_CATEGORY,
+  CATEGORY_NAMES,
+  CATEGORY_VOCABULARY,
+  canonicalCategory,
+  DEFAULT_CATEGORISATION_PROMPT,
   categoryAllowsShorts,
 } from "../../worker/src/queue";
 

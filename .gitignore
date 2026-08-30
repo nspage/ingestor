@@ -61,3 +61,4 @@ docs/WEBHOOK_INTEGRATION.md
 landing-page/BRIEF.md
 landing-page/copy.md
 *.code-workspace
+.muxel/

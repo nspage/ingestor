@@ -40,7 +40,7 @@ Auto-ingest skips clips under 3 minutes unless the channel’s category is **sho
 
 ## Prompts
 
-Category prompts are stored in KV. Edit them in the extension Categories UI, or change worker defaults in `worker/src/index.ts`.
+Category prompts are stored in KV. Edit them in the extension Categories UI, or change worker seed defaults (`DEFAULT_CATEGORIES`, next to the category vocabulary `CATEGORY_VOCABULARY`) in `worker/src/queue.ts`.
 
 ## Visual assets (per category, optional)
 
