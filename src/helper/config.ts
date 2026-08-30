@@ -110,6 +110,8 @@ export interface ProcessedVideo extends PendingVideo {
   cues?: TranscriptCue[];
   analysis: string; // markdown
   processedAt: string;
+  /** Which writer produced the analysis: helper Process or Gemini Web import */
+  analysisSource?: "helper" | "gemini-web";
   descriptionBlock?: string;
   descriptionStatus?: "draft" | "added" | "dismissed";
   assets?: VisualAsset[];
