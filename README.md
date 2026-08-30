@@ -72,6 +72,15 @@ Open the side panel and click **Start helper** once so the panel can store your 
 
 **Process** still needs the helper (transcripts are local). **Gemini** on a pending card opens Gemini Web with a prefill; the extension can import that thread as a note (separate from the API key).
 
+### Two write paths, one store
+
+Both ways of making a note write to the same Worker store, and completing a note always removes the video from pending:
+
+- **API Process** (helper): transcript + your OpenRouter/Gemini key. Notes carry the transcript, token usage, real cost (feeds the daily cost ledger), the description draft, and the optional visual pass (`## On screen` appendix).
+- **Gemini Web import**: free (you pay in Gemini chat), works with the helper off. Notes carry the thread turns only — no transcript, no usage/cost entry, no visual pass.
+
+A Gemini-imported note shows a `· Gemini` marker in History. Either note can be updated later by the same path; the Worker keeps fields a re-save does not send (chat link, description, visual assets) instead of dropping them.
+
 ### Restart the helper
 
 The Start button does nothing if something is already on port 3000. After a `git pull` or code change:
