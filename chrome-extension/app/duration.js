@@ -1,4 +1,5 @@
-export const MIN_PENDING_SECONDS = 180;
+import { MIN_PENDING_SECONDS } from "./inbox-rules.js";
+export { MIN_PENDING_SECONDS };
 
 export function durationLabelToSeconds(label) {
   if (!label) return null;
