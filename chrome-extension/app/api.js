@@ -234,45 +234,26 @@ export async function addChannel(url, category) {
 }
 
 export async function removeChannel(channelId) {
-  try {
-    await workerFetch("/api/channels", { method: "DELETE", body: JSON.stringify({ channelId }) });
-  } catch {
-    await localFetch("/remove-channel", { method: "POST", body: JSON.stringify({ channelId }) });
-  }
+  await workerFetch("/api/channels", { method: "DELETE", body: JSON.stringify({ channelId }) });
   invalidateContext();
 }
 
 export async function updateChannel(channelId, name, category) {
-  try {
-    const channels = await getChannels();
-    const next = channels.map((ch) => (ch.id === channelId ? { ...ch, name, category } : ch));
-    if (!next.some((ch) => ch.id === channelId)) next.push({ id: channelId, name, category });
-    await workerFetch("/api/channels", { method: "PUT", body: JSON.stringify(next) });
-  } catch {
-    await localFetch("/channels/update", {
-      method: "POST",
-      body: JSON.stringify({ channelId, name, category }),
-    });
-  }
+  const channels = await getChannels();
+  const next = channels.map((ch) => (ch.id === channelId ? { ...ch, name, category } : ch));
+  if (!next.some((ch) => ch.id === channelId)) next.push({ id: channelId, name, category });
+  await workerFetch("/api/channels", { method: "PUT", body: JSON.stringify(next) });
   invalidateContext();
 }
 
 export async function saveCategory(name, prompt, model, visualAssets) {
   const body = { name, prompt, model };
   if (visualAssets) body.visualAssets = visualAssets;
-  try {
-    await workerFetch("/api/categories", { method: "POST", body: JSON.stringify(body) });
-  } catch {
-    await localFetch("/categories", { method: "POST", body: JSON.stringify(body) });
-  }
+  await workerFetch("/api/categories", { method: "POST", body: JSON.stringify(body) });
 }
 
 export async function deleteCategory(name) {
-  try {
-    await workerFetch("/api/categories", { method: "DELETE", body: JSON.stringify({ name }) });
-  } catch {
-    await localFetch("/categories/delete", { method: "POST", body: JSON.stringify({ name }) });
-  }
+  await workerFetch("/api/categories", { method: "DELETE", body: JSON.stringify({ name }) });
 }
 
 export async function getCategorisationPrompt() {
@@ -280,19 +261,11 @@ export async function getCategorisationPrompt() {
 }
 
 export async function saveCategorisationPrompt(prompt, model) {
-  try {
-    await workerFetch("/api/categorisation-prompt", { method: "POST", body: JSON.stringify({ prompt, model }) });
-  } catch {
-    await localFetch("/categorisation-prompt", { method: "POST", body: JSON.stringify({ prompt, model }) });
-  }
+  await workerFetch("/api/categorisation-prompt", { method: "POST", body: JSON.stringify({ prompt, model }) });
 }
 
 export async function clearFailed(videoId) {
-  try {
-    await workerFetch("/api/videos/failed", { method: "DELETE", body: JSON.stringify({ videoId }) });
-  } catch {
-    await localFetch("/failed/clear", { method: "POST", body: JSON.stringify({ videoId }) });
-  }
+  await workerFetch("/api/videos/failed", { method: "DELETE", body: JSON.stringify({ videoId }) });
 }
 
 export async function startHelper() {
