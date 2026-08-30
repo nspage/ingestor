@@ -39,6 +39,12 @@
   "action": {
     "default_title": "Open Pipeline"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["img/*"],
+      "matches": ["*://*.youtube.com/*"]
+    }
+  ],
   "commands": {
     "toggle-pipeline": {
       "suggested_key": {
