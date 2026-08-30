@@ -544,7 +544,7 @@ app.post("/api/costs/daily", async (c) => {
 const PUBSUB_HUB_URL = "https://pubsubhubbub.appspot.com/subscribe";
 
 async function unsubscribePubSub(channelId: string, callbackUrl: string): Promise<void> {
-  const topic = `https://www.youtube.com/xml/feeds/videos.xml?channel_id=${channelId}`;
+  const topic = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
   try {
     const response = await fetch(PUBSUB_HUB_URL, {
       method: "POST",

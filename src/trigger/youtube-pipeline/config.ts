@@ -34,7 +34,7 @@ export const PUBSUB_HUB_URL = "https://pubsubhubbub.appspot.com/subscribe";
 
 /** YouTube Atom feed template — replace CHANNEL_ID */
 export const YOUTUBE_FEED_URL = (channelId: string) =>
-  `https://www.youtube.com/xml/feeds/videos.xml?channel_id=${channelId}`;
+  `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
 
 /** Default text model for analysis. Bare Gemini ids are normalized to `google/…` at call time. */
 export const GEMINI_MODEL = "gemini-3.1-flash-lite";
